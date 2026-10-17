@@ -1,86 +1,240 @@
+<h1 align="center">Hand Gesture Volume Control</h1>
 
-# Volume Control by Hand Gesture using Mediapipe
-This project enables intuitive volume adjustment using hand gestures detected by a webcam. It replaces traditional volume control methods with a more interactive approach, allowing users to manage their device's volume effortlessly through real-time gesture recognition.
+<p align="center">
+  Change your Windows volume by pinching your thumb and index finger in front of the webcam.<br>
+  A live window draws the tracked hand and a volume bar while the system volume follows your fingers.
+</p>
 
+<p align="center">
+  <a href="#try-it-live">Try it</a>
+  &middot;
+  <a href="#how-it-works">How it works</a>
+  &middot;
+  <a href="#run-it-locally">Run locally</a>
+  &middot;
+  <a href="#environment-variables">Settings</a>
+</p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12">
+  <img src="https://img.shields.io/badge/MediaPipe-0.10.21-0097A7?logo=google&logoColor=white" alt="MediaPipe 0.10.21">
+  <img src="https://img.shields.io/badge/OpenCV-4.11-5C3EE8?logo=opencv&logoColor=white" alt="OpenCV 4.11">
+  <img src="https://img.shields.io/badge/Windows-only-0078D6?logo=windows&logoColor=white" alt="Windows only">
+</p>
 
-## Problem Statement
-The traditional methods of controlling volume on devices lack intuitiveness and user engagement. Users often need to rely on external devices or keyboard shortcuts. This project aims to address this issue by implementing a system that allows users to control the volume using hand gestures captured through a webcam..
+<p align="center">
+  <img src="docs/images/demo.jpg" width="60%" alt="The preview window: tracked hand landmarks, a magenta line between thumb and index finger, and a green volume bar at 75 percent">
+</p>
 
-## Domain
-Human-Computer Interaction (HCI) and Computer Vision are the primary domains for this project. The integration of hand gesture recognition through Mediapipe facilitates a more natural and interactive way of controlling volume.
+<p align="center"><sub>Last updated: 2026-10-17 &middot; Runs locally on Windows (checked 2026-10-17); no hosted version, it needs your webcam and speakers</sub></p>
 
-## Introduction
-In the realm of human-computer interaction (HCI), the quest for more intuitive and immersive interfaces continues to drive technological innovation. Traditional methods of device interaction, particularly in controlling audio parameters like volume, often involve manual inputs through physical buttons or keyboard shortcuts. Recognizing the need for a more natural and engaging interface, this project introduces a novel approach to volume control using hand gestures captured through a webcam.
+---
 
-## Motivation
-The motivation behind this project stems from the desire to enhance user experience and accessibility in the realm of audio control. Conventional methods, while functional, often lack the intuitive and personalized touch that comes with gesture-based systems. By harnessing the capabilities of computer vision, the project seeks to redefine the way users interact with their devices, making the experience more seamless, enjoyable, and adaptable to individual preferences.
+## Contents
 
-## Literature Review
-Gesture-Based Interaction:
-Gesture-based interaction has been a focal point in the field of Human-Computer Interaction (HCI), aiming to create more intuitive and natural interfaces. The work of Wobbrock et al. (2007) introduced the concept of gesture recognition without the need for extensive libraries or training, emphasizing simplicity and user-friendly interactions. This foundational research laid the groundwork for exploring gesture-based systems in various applications.
+- [About](#about)
+- [Try it live](#try-it-live)
+- [Features](#features)
+- [Why it exists](#why-it-exists)
+- [How it works](#how-it-works)
+- [Engineering quality](#engineering-quality)
+- [Run it locally](#run-it-locally)
+- [Environment variables](#environment-variables)
+- [Deployment](#deployment)
+- [Status and roadmap](#status-and-roadmap)
+- [Credits](#credits)
 
-Computer Vision in HCI:
-The integration of computer vision technologies has significantly advanced the possibilities of gesture recognition. Notably, the work of Ojala et al. (2002) on rotation-invariant texture classification with local binary patterns has been influential. Computer vision techniques have since evolved, with libraries like OpenCV providing robust tools for real-time image processing and feature extraction, crucial for accurate gesture recognition.
+## About
 
-Hand Landmark Detection with Mediapipe:
-Mediapipe, developed by Google, has emerged as a powerful library for hand landmark detection. The approach presented by C. R. Wren et al. (1997) in "Pfinder: Real-time tracking of the human body" laid the foundation for real-time tracking of body parts, a concept further refined by Mediapipe. The library's ability to precisely locate hand landmarks in real-time has become instrumental in creating interactive and dynamic systems.
+Turning the volume up or down means reaching for a key or a slider, which is awkward when your hands
+are busy or you sit back from the screen. This program reads your webcam, finds your hand, and sets
+the master volume from how far apart your thumb and index finger are: pinched is 0%, spread is 100%.
 
-Gesture Control in HCI Applications:
-Gesture-based control systems have found applications in diverse fields. Research by Microsoft on the Kinect sensor showcased the potential of full-body gesture control in gaming and interactive environments. The exploration of gestures for specific tasks, such as volume control, has become an area of interest for enhancing user experiences.
+It is a small desktop tool, not a service: everything runs on your own machine and no video leaves it.
 
-## Limitations in Existing Solutions
-Traditional volume control methods, relying on physical buttons or remote controls, often lack the finesse and immediacy of gesture-based systems. Additionally, infrared or Bluetooth-based solutions may face challenges in terms of accuracy and responsiveness. These limitations underscore the need for innovative approaches, like the one proposed in this project.
+## Try it live
 
-## Code Review
-cv2 (OpenCV): For graphical functions and webcam access.
-numpy: For kernel calculation, image pixel manipulation, and adjusting ranges accordingly.
-math: To perform mathematical functions such as distance calculations and Pythagoras theorem.
-mediapipe: Accesses functions related to hand gestures and screen coordinates.
-pyautogui: Enables control of the mouse cursor and keyboard for future enhancements.
-pycaw and comtypes: Used for importing audio control abilities.
-handi_cap Class:
+Not deployed yet, and it cannot be: the program needs your webcam and your Windows speakers. Follow
+[Run it locally](#run-it-locally) (about five minutes), then:
 
-This class encapsulates functionalities related to hand gesture recognition using the Mediapipe library.
-The trace method traces the hand on the webcam frame.
-The lmarks method returns the landmarks' coordinates on the screen where hands are present.
-Main Function (main):
+1. Run `python handdetect.py`; a window titled "Hand" opens with your camera feed.
+2. Hold one hand in view. Dots and lines appear on it, with a magenta line between thumb tip and index tip.
+3. Pinch and spread your fingers. The green bar and the percentage follow, and so does the Windows volume.
+4. Press Esc to quit.
 
-Creates a video capture object to start capturing frames from the webcam.
-Initializes instances of the handi_cap class for hand gesture recognition.
-Sets up audio control interfaces using the PyCaw library.
-Defines a backbone loop that continuously processes webcam frames.
-Hand Gesture Recognition and Volume Control:
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/demo.jpg" alt="Hand tracked with the volume bar at 75 percent"><p align="center"><sub>The preview window while running (<a href="#how-it-works">how it works</a>)</sub></p></td>
+    <td width="50%"><img src="docs/images/hand-landmarks.jpg" alt="MediaPipe's 21 hand landmarks, numbered"><p align="center"><sub>The 21 landmarks MediaPipe returns; the code uses 4 and 8 (<a href="#how-it-works">how it works</a>)</sub></p></td>
+  </tr>
+</table>
 
-Utilizes the handi_cap class to trace hands on the webcam frames and retrieve hand landmarks.
-Calculates the distance between specific landmarks (thumb and index finger) to map to volume control.
-Interpolates the distance to adjust volume within a specified range.
-Updates the volume using the PyCaw library based on the calculated distance.
-Displays the current volume level on the screen.
-Visual Feedback:
+## Features
 
-Draws circles and lines on the webcam frames to visually represent the recognized hand landmarks and gestures.
-Rectangles and text are used to display the volume control range and percentage on the screen.
-User Interface:
+- **Pinch-to-volume**: the distance between thumb tip and index tip sets the master volume.
+  - Linear between two distances you can change (default 50 px and 250 px).
+  - Below the lower distance the volume is 0%, above the upper one it is 100%.
+- **Live feedback**: the window shows the tracked hand, the pinch line and a volume bar with a percentage.
+- **Mirrored preview**: the image is flipped so moving your hand right moves it right on screen.
+- **Tunable by environment variables**: camera index, pinch range, hands to track and detection confidence.
+- **Clean exit**: Esc closes the window and releases the camera.
 
-The cv2.imshow function displays the processed webcam frame with overlaid hand landmarks and volume information.
-The loop continues until the user presses the 'Esc' key (key==27), at which point the script releases the webcam and closes the OpenCV windows.
-Execution:
-To execute the script, run the main function. The script captures webcam frames, detects hand landmarks, interprets gestures, and adjusts the system volume accordingly in real-time. The visual representation on the screen provides feedback on the volume control process.
+## Why it exists
 
-## References
-Mediapipe Documentation:
-Mediapipe GitHub Repository
+A university project to try real-time computer vision: use a ready hand-landmark model for something
+you can feel working straight away. It taught how to turn pixel coordinates into a control signal,
+and how fast a Windows audio API changes between releases (see the pycaw note under *Design decisions*).
 
-Computer Vision and Gesture Recognition:
-OpenCV Documentation: OpenCV Documentation
-C. R. Wren, A. Azarbayejani, T. Darrell, and A. P. Pentland, "Pfinder: Real-time tracking of the human body," IEEE Transactions on Pattern Analysis and Machine Intelligence, vol. 19, no. 7, pp. 780-785, 1997.
+## How it works
 
-Audio Control in Python:
-PyCaw GitHub Repository: PyCaw GitHub
-Real Python, "Working with Audio Files in Python": Real Python Audio Tutorial
+```mermaid
+flowchart LR
+    Cam["Webcam (OpenCV)"] --> Flip["Mirror the frame"]
+    Flip --> MP["MediaPipe Hands: 21 landmarks"]
+    MP --> Dist["Distance, thumb tip 4 to index tip 8"]
+    Dist --> Map["mapping.py: pixels to percent to decibels"]
+    Map --> Audio["pycaw: Windows endpoint volume"]
+    MP --> Draw["Draw hand, line and volume bar"]
+    Draw --> Win["Preview window"]
+```
 
-## Project Images
-![Python 1](https://github.com/user-attachments/assets/c5544b00-f340-4842-b3c5-a3ae5c100571)
-![Python Two](https://github.com/user-attachments/assets/8efca02c-ae94-4671-a7a0-364bee6b3fcc)
+What happens on each frame:
 
+```mermaid
+sequenceDiagram
+    participant L as main loop (handdetect.py)
+    participant T as HandTracker
+    participant M as mapping.py
+    participant A as Windows audio
+    L->>T: process(frame)
+    T-->>L: 21 landmark points, or none
+    L->>M: pinch_to_percent(distance)
+    M-->>L: 0 to 100
+    L->>M: percent_to_decibel(percent, min, max)
+    L->>A: SetMasterVolumeLevel(decibels)
+    L->>L: draw bar and show window
+```
+
+When no hand is in view the volume is left alone; it only changes while a hand is tracked.
+
+### Tech stack
+
+| Layer | Technology |
+|---|---|
+| Language | Python 3.12 (pinned in `mise.toml`) |
+| Hand tracking | MediaPipe Hands 0.10.21 |
+| Camera and drawing | OpenCV 4.11 |
+| Volume control | pycaw and comtypes (Windows Core Audio) |
+| Tests | pytest |
+| Hosting | none, runs on your machine |
+
+### Design decisions
+
+1. **MediaPipe instead of a trained model.** A ready hand-landmark model gives 21 points per frame with no training. Trade-off: it depends on Google's package, and the `mp.solutions` API is why `mediapipe` is pinned to 0.10.21.
+2. **Conversion kept in a pure module.** `mapping.py` has no camera or audio imports, so the pixels-to-decibels logic is unit-tested without hardware. Trade-off: one more file for two small functions.
+3. **Windows volume is set in decibels, not percent.** The device reports its own decibel range, and the percentage is interpolated onto it, so 50% on screen is halfway in decibels. Trade-off: perceived loudness is not linear in decibels, so the middle can feel loud.
+4. **pycaw current API.** Newer pycaw returns a device object with an `EndpointVolume` property; the old `Activate(...)` call fails with `AttributeError`. The code uses the new one, and `requirements.txt` pins pycaw so it stays that way.
+
+<details>
+<summary><strong>Project structure</strong></summary>
+
+```
+handdetect.py        webcam loop, hand tracking, drawing, volume call
+mapping.py           pinch distance to percent to decibels (pure functions)
+config.py            every setting, read from environment variables
+tests/               unit tests for mapping.py
+docs/images/         screenshots
+mise.toml            Python version pin
+requirements.txt     runtime dependencies, versions pinned
+.env.example         every setting with a comment
+```
+
+</details>
+
+## Engineering quality
+
+| Area | What is in place |
+|---|---|
+| Tests | 6 pytest cases on the distance-to-volume conversion (clamping, linearity, device range), all passing on 2026-10-17 |
+| Startup check | on 2026-10-17 the app opened the camera and the speaker endpoint and ran 10 seconds without error on Windows 11 |
+| Configuration | every value from environment variables with a clear error for a bad one; no secrets are involved |
+| Not covered | the hand tracking itself and the live volume change are checked by hand, not by tests; there is no CI |
+
+Run the tests:
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+## Run it locally
+
+Windows 10 or 11 only (pycaw uses Windows Core Audio), with a webcam. You need **Python 3.12**
+(`mise.toml` pins it; [mise](https://mise.jdx.dev) installs and selects it, or install Python 3.12 yourself).
+MediaPipe 0.10.21 has no wheels for newer Python releases.
+
+```bash
+git clone https://github.com/A-RYAN-1/hand-gesture-volume-control.git
+cd hand-gesture-volume-control
+mise install                      # installs the pinned Python 3.12
+mise exec -- python -m venv .venv
+source .venv/Scripts/activate     # Git Bash; in PowerShell: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python handdetect.py
+```
+
+Turn the system volume to a middle level first and keep it audible: the program takes it over as
+soon as it sees a hand.
+
+<details>
+<summary><strong>Common problems</strong></summary>
+
+- `AttributeError: 'AudioDevice' object has no attribute 'Activate'`: you are running an old copy of the script against a new pycaw; use this repository's `handdetect.py`.
+- `Cannot open camera 0; set the CAMERA_INDEX environment variable`: another program holds the camera, or the camera is not index 0; close the other program or set `CAMERA_INDEX=1`.
+- `No matching distribution found for mediapipe==0.10.21`: your Python is newer than 3.12; use the pinned version.
+- The volume jumps to maximum with your fingers close together: raise `PINCH_MAX_PX` in the settings when you sit far from the camera.
+
+</details>
+
+## Environment variables
+
+All optional. Copy `.env.example` for the list; the program reads the process environment, so export
+the ones you change (for example `export CAMERA_INDEX=1` in Git Bash before running).
+
+| Variable | What it is | Default |
+|---|---|---|
+| `CAMERA_INDEX` | which camera to open | `0` |
+| `PINCH_MIN_PX` | thumb-to-index distance meaning 0% | `50` |
+| `PINCH_MAX_PX` | thumb-to-index distance meaning 100% | `250` |
+| `MAX_HANDS` | hands to look for (the first one controls the volume) | `1` |
+| `DETECTION_CONFIDENCE` | MediaPipe detection threshold, 0 to 1 | `0.5` |
+
+No secrets are used. Never commit a real `.env` file; only `.env.example` is tracked.
+
+## Deployment
+
+Not deployed yet, by design: it controls the speakers and camera of the machine it runs on, so there
+is nothing to host. The realistic "release" is this repository run locally.
+
+## Status and roadmap
+
+**Reached:** runs locally on Windows 11 (checked 2026-10-17): camera opens, speaker endpoint found,
+10-second run clean, 6 unit tests pass.
+
+**Known limitations**
+
+- Windows only.
+- Tested by hand with one hand and one camera; pinch distance is in pixels, so it depends on how far you sit from the camera.
+- The first hand MediaPipe reports controls the volume, left or right.
+- No CI.
+
+**Planned**
+
+- [ ] Normalise the pinch distance by hand size so the distance from the camera stops mattering.
+- [ ] Smooth the volume to remove jitter.
+- [ ] A key to lock the volume while the hand moves away.
+
+## Credits
+
+Built by [Aryan Deshmukh](https://github.com/A-RYAN-1) as a university project (2024); the baseline
+(settings, tests, current pycaw API, this README) was done in October 2026.
