@@ -74,6 +74,7 @@ Not deployed yet, and it cannot be: the program needs your webcam and your Windo
 - **Pinch-to-volume**: the distance between thumb tip and index tip sets the master volume.
   - The distance is divided by your hand size (wrist to middle-finger knuckle), so sitting nearer or further from the camera does not change the result.
   - Linear between two ratios you can change (default 0.15 and 1.0); below the lower one the volume is 0%, above the upper one it is 100%.
+- **Smoothed volume**: the pinch ratio goes through an exponential moving average (weight `SMOOTHING_ALPHA`, default 0.4), so landmark jitter does not shake the volume; the average restarts when the hand leaves the frame.
 - **Live feedback**: the window shows the tracked hand, the pinch line and a volume bar with a percentage.
 - **Mirrored preview**: the image is flipped so moving your hand right moves it right on screen.
 - **Tunable by environment variables**: camera index, pinch ratios, hands to track and detection confidence.
@@ -92,7 +93,8 @@ flowchart LR
     Cam["Webcam (OpenCV)"] --> Flip["Mirror the frame"]
     Flip --> MP["MediaPipe Hands: 21 landmarks"]
     MP --> Dist["Pinch ratio: thumb tip 4 to index tip 8, over wrist 0 to middle knuckle 9"]
-    Dist --> Map["mapping.py: ratio to percent to decibels"]
+    Dist --> Smooth["Moving average"]
+    Smooth --> Map["mapping.py: ratio to percent to decibels"]
     Map --> Audio["pycaw: Windows endpoint volume"]
     MP --> Draw["Draw hand, line and volume bar"]
     Draw --> Win["Preview window"]
@@ -108,7 +110,8 @@ sequenceDiagram
     participant A as Windows audio
     L->>T: process(frame)
     T-->>L: 21 landmark points, or none
-    L->>M: pinch_ratio(points), pinch_to_percent(ratio)
+    L->>M: pinch_ratio(points), smooth(previous, ratio)
+    L->>M: pinch_to_percent(smoothed)
     M-->>L: 0 to 100
     L->>M: percent_to_decibel(percent, min, max)
     L->>A: SetMasterVolumeLevel(decibels)
@@ -134,13 +137,15 @@ When no hand is in view the volume is left alone; it only changes while a hand i
 2. **Conversion kept in a pure module.** `mapping.py` has no camera or audio imports, so the ratio-to-decibels logic is unit-tested without hardware. Trade-off: one more file for two small functions.
 3. **Windows volume is set in decibels, not percent.** The device reports its own decibel range, and the percentage is interpolated onto it, so 50% on screen is halfway in decibels. Trade-off: perceived loudness is not linear in decibels, so the middle can feel loud.
 4. **Pinch measured against hand size, not pixels.** The same pinch is twice as many pixels at half the distance, so the distance is divided by the wrist to middle-knuckle length from the same frame. Trade-off: a hand turned edge-on shortens that reference in 2D and raises the ratio; MediaPipe's depth value is not used.
-5. **pycaw current API.** Newer pycaw returns a device object with an `EndpointVolume` property; the old `Activate(...)` call fails with `AttributeError`. The code uses the new one, and `requirements.txt` pins pycaw so it stays that way.
+5. **Moving average, not a filter library.** One line of arithmetic, one setting. Trade-off: lag grows as the weight falls; at 0.4 a step reaches 90% in 5 frames. A median or Kalman filter would cost more code for a small tool.
+6. **pycaw current API.** Newer pycaw returns a device object with an `EndpointVolume` property; the old `Activate(...)` call fails with `AttributeError`. The code uses the new one, and `requirements.txt` pins pycaw so it stays that way.
 
 <details>
 <summary><strong>Project structure</strong></summary>
 
 ```
 handdetect.py        webcam loop, hand tracking, drawing, volume call
+tools/measure_jitter.py jitter and lag before and after smoothing, on synthetic noise
 mapping.py           pinch ratio (pinch over hand size) to percent to decibels (pure functions)
 config.py            every setting, read from environment variables
 tests/               unit tests for mapping.py
@@ -156,7 +161,8 @@ requirements.txt     runtime dependencies, versions pinned
 
 | Area | What is in place |
 |---|---|
-| Tests | 17 pytest cases (2026-10-22): the ratio-to-volume conversion (clamping, linearity, device range), the same pose at four scales giving the same volume, a zero hand size, and config validation; none need a webcam |
+| Tests | 26 pytest cases (2026-10-22): the ratio-to-volume conversion (clamping, linearity, device range), the same pose at four scales giving the same volume, a zero hand size, smoothing, and config validation; none need a webcam |
+| Jitter | `python tools/measure_jitter.py` on a synthetic held pinch with Gaussian landmark noise (3000 frames, seed 7, 2026-10-22): jitter 3.50 volume points with smoothing off, 1.79 at the default (49% lower); a step to 100% reaches 90% after 1 frame off, 5 frames at the default. Synthetic, not measured on a webcam |
 | Startup check | on 2026-10-17 the app opened the camera and the speaker endpoint and ran 10 seconds without error on Windows 11 |
 | Configuration | every value from environment variables with a clear error for a bad one; no secrets are involved |
 | Not covered | the hand tracking itself and the live volume change are checked by hand, not by tests, and the hand-size change (2026-10-22) has not been run on a webcam; there is no CI |
@@ -207,6 +213,7 @@ the ones you change (for example `export CAMERA_INDEX=1` in Git Bash before runn
 | `CAMERA_INDEX` | which camera to open | `0` |
 | `PINCH_MIN_RATIO` | thumb-to-index distance as a fraction of hand size meaning 0% | `0.15` |
 | `PINCH_MAX_RATIO` | thumb-to-index distance as a fraction of hand size meaning 100% | `1.0` |
+| `SMOOTHING_ALPHA` | weight of the newest frame in the smoothed pinch, above 0 to 1 (1 is off) | `0.4` |
 | `MAX_HANDS` | hands to look for (the first one controls the volume) | `1` |
 | `DETECTION_CONFIDENCE` | MediaPipe detection threshold, 0 to 1 | `0.5` |
 
@@ -227,11 +234,11 @@ is nothing to host. The realistic "release" is this repository run locally.
 - Windows only.
 - Tested by hand with one hand and one camera; the pinch is relative to hand size, but a hand turned edge-on to the camera reads as a wider pinch, and the 0.15 and 1.0 defaults have not been tuned on a live webcam.
 - The first hand MediaPipe reports controls the volume, left or right.
+- Smoothing is verified on synthetic noise only; the real jitter of your webcam and hand has not been measured.
 - No CI.
 
 **Planned**
 
-- [ ] Smooth the volume to remove jitter.
 - [ ] A key to lock the volume while the hand moves away.
 
 ## Credits

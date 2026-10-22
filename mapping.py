@@ -32,3 +32,13 @@ def pinch_to_percent(ratio, low, high):
 def percent_to_decibel(percent, min_db, max_db):
     """Windows endpoint volume is set in decibels over the device's own range."""
     return float(np.interp(percent, [0, 100], [min_db, max_db]))
+
+
+def smooth(previous, current, alpha):
+    """Exponential moving average of the pinch ratio: `alpha` 1 follows the raw signal, lower is steadier.
+
+    `previous` is None for the first frame after a hand appears, which starts the average at `current`.
+    """
+    if previous is None:
+        return current
+    return alpha * current + (1 - alpha) * previous
