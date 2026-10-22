@@ -4,7 +4,7 @@ import mediapipe as mp
 from pycaw.pycaw import AudioUtilities
 
 import config
-from mapping import THUMB_TIP, INDEX_TIP, pinch_ratio, pinch_to_percent, percent_to_decibel
+from mapping import THUMB_TIP, INDEX_TIP, pinch_ratio, pinch_to_percent, percent_to_decibel, smooth
 
 ESC = 27
 
@@ -43,6 +43,7 @@ def main():
     volume = open_volume_control()
     min_db, max_db, _ = volume.GetVolumeRange()
     percent = 0.0
+    smoothed = None
     try:
         while True:
             ok, frame = cap.read()
@@ -57,13 +58,16 @@ def main():
                 cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                 ratio = pinch_ratio(points)
                 if ratio is not None:
-                    percent = pinch_to_percent(ratio, config.PINCH_MIN_RATIO, config.PINCH_MAX_RATIO)
+                    smoothed = smooth(smoothed, ratio, config.SMOOTHING_ALPHA)
+                    percent = pinch_to_percent(smoothed, config.PINCH_MIN_RATIO, config.PINCH_MAX_RATIO)
                     volume.SetMasterVolumeLevel(percent_to_decibel(percent, min_db, max_db), None)
                 for point in ((x1, y1), (x2, y2), (cx, cy)):
                     cv2.circle(frame, point, 15, (255, 0, 255), cv2.FILLED)
                 cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 255), 3)
                 if percent == 0:
                     cv2.circle(frame, (cx, cy), 15, (0, 255, 0), cv2.FILLED)
+            else:
+                smoothed = None
             bar_top = int(400 - percent * 2.5)
             cv2.rectangle(frame, (50, 150), (85, 400), (0, 255, 0), 3)
             cv2.rectangle(frame, (50, bar_top), (85, 400), (0, 255, 0), cv2.FILLED)

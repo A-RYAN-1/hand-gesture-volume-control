@@ -32,3 +32,10 @@ def test_a_non_number_is_rejected(monkeypatch):
     monkeypatch.setenv("PINCH_MAX_RATIO", "wide")
     with pytest.raises(SystemExit, match="PINCH_MAX_RATIO"):
         importlib.reload(config)
+
+
+@pytest.mark.parametrize("value", ["0", "1.5", "-0.2"])
+def test_smoothing_alpha_outside_zero_to_one_is_rejected(monkeypatch, value):
+    monkeypatch.setenv("SMOOTHING_ALPHA", value)
+    with pytest.raises(SystemExit, match="SMOOTHING_ALPHA"):
+        importlib.reload(config)
