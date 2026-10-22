@@ -13,11 +13,12 @@ def _number(name, default, cast=float):
 
 
 CAMERA_INDEX = _number("CAMERA_INDEX", 0, int)
-# Thumb-to-index distance in pixels that maps to 0% and 100% volume.
-PINCH_MIN_PX = _number("PINCH_MIN_PX", 50.0)
-PINCH_MAX_PX = _number("PINCH_MAX_PX", 250.0)
+# Thumb-to-index distance as a fraction of the hand size (wrist to middle-finger knuckle) that maps to
+# 0% and 100% volume. A fraction, not pixels, so the distance from the camera does not matter.
+PINCH_MIN_RATIO = _number("PINCH_MIN_RATIO", 0.15)
+PINCH_MAX_RATIO = _number("PINCH_MAX_RATIO", 1.0)
 MAX_HANDS = _number("MAX_HANDS", 1, int)
 DETECTION_CONFIDENCE = _number("DETECTION_CONFIDENCE", 0.5)
 
-if PINCH_MIN_PX >= PINCH_MAX_PX:
-    raise SystemExit("PINCH_MIN_PX must be smaller than PINCH_MAX_PX")
+if PINCH_MIN_RATIO >= PINCH_MAX_RATIO:
+    raise SystemExit("PINCH_MIN_RATIO must be smaller than PINCH_MAX_RATIO")
