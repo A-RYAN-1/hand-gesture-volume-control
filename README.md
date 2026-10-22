@@ -26,7 +26,7 @@
   <img src="docs/images/demo.jpg" width="60%" alt="The preview window: tracked hand landmarks, a magenta line between thumb and index finger, and a green volume bar at 75 percent">
 </p>
 
-<p align="center"><sub>Last updated: 2026-10-17 &middot; Runs locally on Windows (checked 2026-10-17); no hosted version, it needs your webcam and speakers</sub></p>
+<p align="center"><sub>Last updated: 2026-10-22 &middot; Runs locally on Windows (checked 2026-10-17); no hosted version, it needs your webcam and speakers</sub></p>
 
 ---
 
@@ -65,18 +65,18 @@ Not deployed yet, and it cannot be: the program needs your webcam and your Windo
 <table>
   <tr>
     <td width="50%"><img src="docs/images/demo.jpg" alt="Hand tracked with the volume bar at 75 percent"><p align="center"><sub>The preview window while running (<a href="#how-it-works">how it works</a>)</sub></p></td>
-    <td width="50%"><img src="docs/images/hand-landmarks.jpg" alt="MediaPipe's 21 hand landmarks, numbered"><p align="center"><sub>The 21 landmarks MediaPipe returns; the code uses 4 and 8 (<a href="#how-it-works">how it works</a>)</sub></p></td>
+    <td width="50%"><img src="docs/images/hand-landmarks.jpg" alt="MediaPipe's 21 hand landmarks, numbered"><p align="center"><sub>The 21 landmarks MediaPipe returns; the code uses 0, 4, 8 and 9 (<a href="#how-it-works">how it works</a>)</sub></p></td>
   </tr>
 </table>
 
 ## Features
 
 - **Pinch-to-volume**: the distance between thumb tip and index tip sets the master volume.
-  - Linear between two distances you can change (default 50 px and 250 px).
-  - Below the lower distance the volume is 0%, above the upper one it is 100%.
+  - The distance is divided by your hand size (wrist to middle-finger knuckle), so sitting nearer or further from the camera does not change the result.
+  - Linear between two ratios you can change (default 0.15 and 1.0); below the lower one the volume is 0%, above the upper one it is 100%.
 - **Live feedback**: the window shows the tracked hand, the pinch line and a volume bar with a percentage.
 - **Mirrored preview**: the image is flipped so moving your hand right moves it right on screen.
-- **Tunable by environment variables**: camera index, pinch range, hands to track and detection confidence.
+- **Tunable by environment variables**: camera index, pinch ratios, hands to track and detection confidence.
 - **Clean exit**: Esc closes the window and releases the camera.
 
 ## Why it exists
@@ -91,8 +91,8 @@ and how fast a Windows audio API changes between releases (see the pycaw note un
 flowchart LR
     Cam["Webcam (OpenCV)"] --> Flip["Mirror the frame"]
     Flip --> MP["MediaPipe Hands: 21 landmarks"]
-    MP --> Dist["Distance, thumb tip 4 to index tip 8"]
-    Dist --> Map["mapping.py: pixels to percent to decibels"]
+    MP --> Dist["Pinch ratio: thumb tip 4 to index tip 8, over wrist 0 to middle knuckle 9"]
+    Dist --> Map["mapping.py: ratio to percent to decibels"]
     Map --> Audio["pycaw: Windows endpoint volume"]
     MP --> Draw["Draw hand, line and volume bar"]
     Draw --> Win["Preview window"]
@@ -108,7 +108,7 @@ sequenceDiagram
     participant A as Windows audio
     L->>T: process(frame)
     T-->>L: 21 landmark points, or none
-    L->>M: pinch_to_percent(distance)
+    L->>M: pinch_ratio(points), pinch_to_percent(ratio)
     M-->>L: 0 to 100
     L->>M: percent_to_decibel(percent, min, max)
     L->>A: SetMasterVolumeLevel(decibels)
@@ -131,16 +131,17 @@ When no hand is in view the volume is left alone; it only changes while a hand i
 ### Design decisions
 
 1. **MediaPipe instead of a trained model.** A ready hand-landmark model gives 21 points per frame with no training. Trade-off: it depends on Google's package, and the `mp.solutions` API is why `mediapipe` is pinned to 0.10.21.
-2. **Conversion kept in a pure module.** `mapping.py` has no camera or audio imports, so the pixels-to-decibels logic is unit-tested without hardware. Trade-off: one more file for two small functions.
+2. **Conversion kept in a pure module.** `mapping.py` has no camera or audio imports, so the ratio-to-decibels logic is unit-tested without hardware. Trade-off: one more file for two small functions.
 3. **Windows volume is set in decibels, not percent.** The device reports its own decibel range, and the percentage is interpolated onto it, so 50% on screen is halfway in decibels. Trade-off: perceived loudness is not linear in decibels, so the middle can feel loud.
-4. **pycaw current API.** Newer pycaw returns a device object with an `EndpointVolume` property; the old `Activate(...)` call fails with `AttributeError`. The code uses the new one, and `requirements.txt` pins pycaw so it stays that way.
+4. **Pinch measured against hand size, not pixels.** The same pinch is twice as many pixels at half the distance, so the distance is divided by the wrist to middle-knuckle length from the same frame. Trade-off: a hand turned edge-on shortens that reference in 2D and raises the ratio; MediaPipe's depth value is not used.
+5. **pycaw current API.** Newer pycaw returns a device object with an `EndpointVolume` property; the old `Activate(...)` call fails with `AttributeError`. The code uses the new one, and `requirements.txt` pins pycaw so it stays that way.
 
 <details>
 <summary><strong>Project structure</strong></summary>
 
 ```
 handdetect.py        webcam loop, hand tracking, drawing, volume call
-mapping.py           pinch distance to percent to decibels (pure functions)
+mapping.py           pinch ratio (pinch over hand size) to percent to decibels (pure functions)
 config.py            every setting, read from environment variables
 tests/               unit tests for mapping.py
 docs/images/         screenshots
@@ -155,10 +156,10 @@ requirements.txt     runtime dependencies, versions pinned
 
 | Area | What is in place |
 |---|---|
-| Tests | 6 pytest cases on the distance-to-volume conversion (clamping, linearity, device range), all passing on 2026-10-17 |
+| Tests | 17 pytest cases (2026-10-22): the ratio-to-volume conversion (clamping, linearity, device range), the same pose at four scales giving the same volume, a zero hand size, and config validation; none need a webcam |
 | Startup check | on 2026-10-17 the app opened the camera and the speaker endpoint and ran 10 seconds without error on Windows 11 |
 | Configuration | every value from environment variables with a clear error for a bad one; no secrets are involved |
-| Not covered | the hand tracking itself and the live volume change are checked by hand, not by tests; there is no CI |
+| Not covered | the hand tracking itself and the live volume change are checked by hand, not by tests, and the hand-size change (2026-10-22) has not been run on a webcam; there is no CI |
 
 Run the tests:
 
@@ -192,7 +193,7 @@ soon as it sees a hand.
 - `AttributeError: 'AudioDevice' object has no attribute 'Activate'`: you are running an old copy of the script against a new pycaw; use this repository's `handdetect.py`.
 - `Cannot open camera 0; set the CAMERA_INDEX environment variable`: another program holds the camera, or the camera is not index 0; close the other program or set `CAMERA_INDEX=1`.
 - `No matching distribution found for mediapipe==0.10.21`: your Python is newer than 3.12; use the pinned version.
-- The volume jumps to maximum with your fingers close together: raise `PINCH_MAX_PX` in the settings when you sit far from the camera.
+- You cannot reach 100%, or 0% is hard to hit: lower `PINCH_MAX_RATIO` or raise `PINCH_MIN_RATIO`; the defaults are first estimates.
 
 </details>
 
@@ -204,8 +205,8 @@ the ones you change (for example `export CAMERA_INDEX=1` in Git Bash before runn
 | Variable | What it is | Default |
 |---|---|---|
 | `CAMERA_INDEX` | which camera to open | `0` |
-| `PINCH_MIN_PX` | thumb-to-index distance meaning 0% | `50` |
-| `PINCH_MAX_PX` | thumb-to-index distance meaning 100% | `250` |
+| `PINCH_MIN_RATIO` | thumb-to-index distance as a fraction of hand size meaning 0% | `0.15` |
+| `PINCH_MAX_RATIO` | thumb-to-index distance as a fraction of hand size meaning 100% | `1.0` |
 | `MAX_HANDS` | hands to look for (the first one controls the volume) | `1` |
 | `DETECTION_CONFIDENCE` | MediaPipe detection threshold, 0 to 1 | `0.5` |
 
@@ -224,13 +225,12 @@ is nothing to host. The realistic "release" is this repository run locally.
 **Known limitations**
 
 - Windows only.
-- Tested by hand with one hand and one camera; pinch distance is in pixels, so it depends on how far you sit from the camera.
+- Tested by hand with one hand and one camera; the pinch is relative to hand size, but a hand turned edge-on to the camera reads as a wider pinch, and the 0.15 and 1.0 defaults have not been tuned on a live webcam.
 - The first hand MediaPipe reports controls the volume, left or right.
 - No CI.
 
 **Planned**
 
-- [ ] Normalise the pinch distance by hand size so the distance from the camera stops mattering.
 - [ ] Smooth the volume to remove jitter.
 - [ ] A key to lock the volume while the hand moves away.
 
