@@ -39,3 +39,16 @@ def test_smoothing_alpha_outside_zero_to_one_is_rejected(monkeypatch, value):
     monkeypatch.setenv("SMOOTHING_ALPHA", value)
     with pytest.raises(SystemExit, match="SMOOTHING_ALPHA"):
         importlib.reload(config)
+
+
+def test_lock_key_defaults_to_l_and_can_be_overridden(monkeypatch):
+    assert config.LOCK_KEY == "l"
+    monkeypatch.setenv("LOCK_KEY", "k")
+    importlib.reload(config)
+    assert config.LOCK_KEY == "k"
+
+
+def test_lock_key_longer_than_one_character_is_rejected(monkeypatch):
+    monkeypatch.setenv("LOCK_KEY", "lock")
+    with pytest.raises(SystemExit, match="LOCK_KEY"):
+        importlib.reload(config)

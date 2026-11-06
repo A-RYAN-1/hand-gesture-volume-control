@@ -4,6 +4,7 @@ import mediapipe as mp
 from pycaw.pycaw import AudioUtilities
 
 import config
+from lock import VolumeLock
 from mapping import THUMB_TIP, INDEX_TIP, pinch_ratio, pinch_to_percent, percent_to_decibel, smooth
 
 ESC = 27
@@ -44,6 +45,7 @@ def main():
     min_db, max_db, _ = volume.GetVolumeRange()
     percent = 0.0
     smoothed = None
+    lock = VolumeLock()
     try:
         while True:
             ok, frame = cap.read()
@@ -59,7 +61,8 @@ def main():
                 ratio = pinch_ratio(points)
                 if ratio is not None:
                     smoothed = smooth(smoothed, ratio, config.SMOOTHING_ALPHA)
-                    percent = pinch_to_percent(smoothed, config.PINCH_MIN_RATIO, config.PINCH_MAX_RATIO)
+                    live_percent = pinch_to_percent(smoothed, config.PINCH_MIN_RATIO, config.PINCH_MAX_RATIO)
+                    percent = lock.resolve(live_percent)
                     volume.SetMasterVolumeLevel(percent_to_decibel(percent, min_db, max_db), None)
                 for point in ((x1, y1), (x2, y2), (cx, cy)):
                     cv2.circle(frame, point, 15, (255, 0, 255), cv2.FILLED)
@@ -72,9 +75,15 @@ def main():
             cv2.rectangle(frame, (50, 150), (85, 400), (0, 255, 0), 3)
             cv2.rectangle(frame, (50, bar_top), (85, 400), (0, 255, 0), cv2.FILLED)
             cv2.putText(frame, f"{int(percent)}%", (40, 450), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 250, 0), 3)
+            if lock.locked:
+                cv2.putText(frame, f"LOCKED ({config.LOCK_KEY} to unlock)", (40, 100), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 3)
             cv2.imshow("Hand", frame)
-            if cv2.waitKey(1) == ESC:
+            key = cv2.waitKey(1)
+            if key == ESC:
                 break
+            if key == ord(config.LOCK_KEY):
+                lock.toggle(percent)
+                smoothed = None
     finally:
         cap.release()
         cv2.destroyAllWindows()

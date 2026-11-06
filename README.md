@@ -26,7 +26,7 @@
   <img src="docs/images/demo.jpg" width="60%" alt="The preview window: tracked hand landmarks, a magenta line between thumb and index finger, and a green volume bar at 75 percent">
 </p>
 
-<p align="center"><sub>Last updated: 2026-10-22 &middot; Runs locally on Windows (checked 2026-10-17); no hosted version, it needs your webcam and speakers</sub></p>
+<p align="center"><sub>Last updated: 2026-11-06 &middot; Runs locally on Windows (checked 2026-10-17); no hosted version, it needs your webcam and speakers</sub></p>
 
 ---
 
@@ -75,9 +75,10 @@ Not deployed yet, and it cannot be: the program needs your webcam and your Windo
   - The distance is divided by your hand size (wrist to middle-finger knuckle), so sitting nearer or further from the camera does not change the result.
   - Linear between two ratios you can change (default 0.15 and 1.0); below the lower one the volume is 0%, above the upper one it is 100%.
 - **Smoothed volume**: the pinch ratio goes through an exponential moving average (weight `SMOOTHING_ALPHA`, default 0.4), so landmark jitter does not shake the volume; the average restarts when the hand leaves the frame.
+- **Volume lock**: press `L` (change with `LOCK_KEY`) with the preview window focused to freeze the volume at its current value, so you can lower your hand during a call or a film; the window shows LOCKED and the hand is still drawn. Press the key again to follow your pinch again.
 - **Live feedback**: the window shows the tracked hand, the pinch line and a volume bar with a percentage.
 - **Mirrored preview**: the image is flipped so moving your hand right moves it right on screen.
-- **Tunable by environment variables**: camera index, pinch ratios, hands to track and detection confidence.
+- **Tunable by environment variables**: camera index, pinch ratios, lock key, hands to track and detection confidence.
 - **Clean exit**: Esc closes the window and releases the camera.
 
 ## Why it exists
@@ -214,6 +215,7 @@ the ones you change (for example `export CAMERA_INDEX=1` in Git Bash before runn
 | `PINCH_MIN_RATIO` | thumb-to-index distance as a fraction of hand size meaning 0% | `0.15` |
 | `PINCH_MAX_RATIO` | thumb-to-index distance as a fraction of hand size meaning 100% | `1.0` |
 | `SMOOTHING_ALPHA` | weight of the newest frame in the smoothed pinch, above 0 to 1 (1 is off) | `0.4` |
+| `LOCK_KEY` | single key that locks and unlocks the volume | `l` |
 | `MAX_HANDS` | hands to look for (the first one controls the volume) | `1` |
 | `DETECTION_CONFIDENCE` | MediaPipe detection threshold, 0 to 1 | `0.5` |
 
