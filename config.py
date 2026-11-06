@@ -19,6 +19,8 @@ PINCH_MIN_RATIO = _number("PINCH_MIN_RATIO", 0.15)
 PINCH_MAX_RATIO = _number("PINCH_MAX_RATIO", 1.0)
 # Weight of the newest frame in the smoothed pinch ratio, above 0 up to 1 (1 turns smoothing off).
 SMOOTHING_ALPHA = _number("SMOOTHING_ALPHA", 0.4)
+# Key that toggles the volume lock while the preview window is focused: a single character.
+LOCK_KEY = os.environ.get("LOCK_KEY") or "l"
 MAX_HANDS = _number("MAX_HANDS", 1, int)
 DETECTION_CONFIDENCE = _number("DETECTION_CONFIDENCE", 0.5)
 
@@ -26,3 +28,5 @@ if PINCH_MIN_RATIO >= PINCH_MAX_RATIO:
     raise SystemExit("PINCH_MIN_RATIO must be smaller than PINCH_MAX_RATIO")
 if not 0 < SMOOTHING_ALPHA <= 1:
     raise SystemExit("SMOOTHING_ALPHA must be above 0 and at most 1")
+if len(LOCK_KEY) != 1:
+    raise SystemExit("LOCK_KEY must be a single character")
