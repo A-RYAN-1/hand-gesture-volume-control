@@ -1,9 +1,13 @@
-"""Control the Windows master volume with the thumb-to-index pinch seen by the webcam."""
+"""Control the Windows master volume with the thumb-to-index pinch seen by the webcam; a held fist mutes."""
+import time
+
 import cv2
 import mediapipe as mp
 from pycaw.pycaw import AudioUtilities
 
+import calibration
 import config
+from gestures import GestureHold, is_fist
 from lock import VolumeLock
 from mapping import THUMB_TIP, INDEX_TIP, pinch_ratio, pinch_to_percent, percent_to_decibel, smooth
 
@@ -22,13 +26,17 @@ class HandTracker:
 
     def process(self, frame):
         """Returns the landmarks of the first hand as [id, x, y] pixel points, drawing the hand on `frame`."""
-        result = self.hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        if not result.multi_hand_landmarks:
+        hand = self.first_hand(frame)
+        if hand is None:
             return []
-        hand = result.multi_hand_landmarks[0]
         self.draw.draw_landmarks(frame, hand, mp.solutions.hands.HAND_CONNECTIONS)
         height, width, _ = frame.shape
         return [[i, int(p.x * width), int(p.y * height)] for i, p in enumerate(hand.landmark)]
+
+    def first_hand(self, frame):
+        """MediaPipe's landmarks of the first hand (x and y as fractions of the frame), or None."""
+        result = self.hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        return result.multi_hand_landmarks[0] if result.multi_hand_landmarks else None
 
 
 def open_volume_control():
@@ -46,6 +54,10 @@ def main():
     percent = 0.0
     smoothed = None
     lock = VolumeLock()
+    pinch_range = calibration.load(config.CALIBRATION_FILE) or (config.PINCH_MIN_RATIO, config.PINCH_MAX_RATIO)
+    session = None
+    notice, notice_until = "", 0.0
+    fist = GestureHold(config.MUTE_HOLD_FRAMES)
     try:
         while True:
             ok, frame = cap.read()
@@ -59,9 +71,14 @@ def main():
                 x2, y2 = points[INDEX_TIP][1:]
                 cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                 ratio = pinch_ratio(points)
-                if ratio is not None:
+                if fist.update(is_fist(points, config.FIST_MAX_EXTENSION, config.FIST_MAX_THUMB_REACH)):
+                    volume.SetMute(not volume.GetMute(), None)
+                if session is not None:
+                    session.add(ratio)  # the volume stays put while the user sweeps the pinch
+                elif ratio is not None and not fist.forming:
+                    # a closing fist also closes the pinch: hold the volume until the hand opens again
                     smoothed = smooth(smoothed, ratio, config.SMOOTHING_ALPHA)
-                    live_percent = pinch_to_percent(smoothed, config.PINCH_MIN_RATIO, config.PINCH_MAX_RATIO)
+                    live_percent = pinch_to_percent(smoothed, *pinch_range)
                     percent = lock.resolve(live_percent)
                     volume.SetMasterVolumeLevel(percent_to_decibel(percent, min_db, max_db), None)
                 for point in ((x1, y1), (x2, y2), (cx, cy)):
@@ -71,12 +88,29 @@ def main():
                     cv2.circle(frame, (cx, cy), 15, (0, 255, 0), cv2.FILLED)
             else:
                 smoothed = None
+                fist.update(False)
+            now = time.monotonic()
+            if session is not None and session.done(now):
+                try:
+                    pinch_range = calibration.calibrate(session.ratios)
+                    calibration.save(config.CALIBRATION_FILE, *pinch_range)
+                    notice = f"Calibrated: {pinch_range[0]} to {pinch_range[1]}"
+                except calibration.CalibrationError as e:
+                    notice = f"Calibration failed: {e}"
+                session, smoothed, notice_until = None, None, now + 4
             bar_top = int(400 - percent * 2.5)
             cv2.rectangle(frame, (50, 150), (85, 400), (0, 255, 0), 3)
             cv2.rectangle(frame, (50, bar_top), (85, 400), (0, 255, 0), cv2.FILLED)
             cv2.putText(frame, f"{int(percent)}%", (40, 450), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 250, 0), 3)
             if lock.locked:
                 cv2.putText(frame, f"LOCKED ({config.LOCK_KEY} to unlock)", (40, 100), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 3)
+            if volume.GetMute():
+                cv2.putText(frame, "MUTED (hold a fist to unmute)", (40, 60), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 255), 2)
+            if session is not None:
+                cv2.putText(frame, f"CALIBRATING {session.remaining(now):.0f}s: open and close the pinch", (40, 130),
+                            cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 0), 2)
+            elif now < notice_until:
+                cv2.putText(frame, notice[:60], (40, 130), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 0), 2)
             cv2.imshow("Hand", frame)
             key = cv2.waitKey(1)
             if key == ESC:
@@ -84,6 +118,8 @@ def main():
             if key == ord(config.LOCK_KEY):
                 lock.toggle(percent)
                 smoothed = None
+            if key == ord(config.CALIBRATE_KEY) and session is None:
+                session = calibration.CalibrationSession(time.monotonic(), config.CALIBRATION_SECONDS)
     finally:
         cap.release()
         cv2.destroyAllWindows()

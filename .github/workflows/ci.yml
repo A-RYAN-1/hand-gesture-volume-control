@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # The tested modules are pure; MediaPipe, OpenCV and pycaw (Windows audio) are only needed to run the app.
+      - name: Install
+        run: pip install numpy==1.26.4 pytest
+      - name: Test
+        run: python -m pytest -q
+      - name: Fit the fist thresholds on the fit split
+        run: python tools/fit_fist.py
+      - name: Evaluate on the fit split
+        run: python tools/evaluate_gestures.py fit
