@@ -12,6 +12,7 @@ from lock import VolumeLock
 from mapping import THUMB_TIP, INDEX_TIP, pinch_ratio, pinch_to_percent, percent_to_decibel, smooth
 
 ESC = 27
+NOTICE_SECONDS = 4  # how long the calibration result stays on screen
 
 
 class HandTracker:
@@ -71,7 +72,8 @@ def main():
                 x2, y2 = points[INDEX_TIP][1:]
                 cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                 ratio = pinch_ratio(points)
-                if fist.update(is_fist(points, config.FIST_MAX_EXTENSION, config.FIST_MAX_THUMB_REACH)):
+                fist_seen = session is None and is_fist(points, config.FIST_MAX_EXTENSION, config.FIST_MAX_THUMB_REACH)
+                if fist.update(fist_seen):  # no mute while a calibration sweeps the pinch
                     volume.SetMute(not volume.GetMute(), None)
                 if session is not None:
                     session.add(ratio)  # the volume stays put while the user sweeps the pinch
@@ -97,7 +99,7 @@ def main():
                     notice = f"Calibrated: {pinch_range[0]} to {pinch_range[1]}"
                 except calibration.CalibrationError as e:
                     notice = f"Calibration failed: {e}"
-                session, smoothed, notice_until = None, None, now + 4
+                session, smoothed, notice_until = None, None, now + NOTICE_SECONDS
             bar_top = int(400 - percent * 2.5)
             cv2.rectangle(frame, (50, 150), (85, 400), (0, 255, 0), 3)
             cv2.rectangle(frame, (50, bar_top), (85, 400), (0, 255, 0), cv2.FILLED)
