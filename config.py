@@ -26,9 +26,9 @@ CALIBRATE_KEY = os.environ.get("CALIBRATE_KEY") or "c"
 CALIBRATION_SECONDS = _number("CALIBRATION_SECONDS", 5.0)
 CALIBRATION_FILE = os.environ.get("CALIBRATION_FILE") or os.path.join(
     os.path.expanduser("~"), ".hand-gesture-volume-control", "calibration.json")
-# Fist (mute) thresholds, fitted by tools/fit_fist.py on recorded hands; see gestures.py for what they measure.
-FIST_MAX_EXTENSION = _number("FIST_MAX_EXTENSION", 1.0)
-FIST_MAX_THUMB_REACH = _number("FIST_MAX_THUMB_REACH", 0.8)
+# Fist (mute) thresholds, fitted by tools/fit_fist.py on the HaGRID fit split (2026-11-12); see gestures.py.
+FIST_MAX_EXTENSION = _number("FIST_MAX_EXTENSION", 0.77)
+FIST_MAX_THUMB_REACH = _number("FIST_MAX_THUMB_REACH", 0.56)
 # Frames in a row a fist must be held before it toggles mute (about a third of a second at 30 frames a second).
 MUTE_HOLD_FRAMES = _number("MUTE_HOLD_FRAMES", 10, int)
 MAX_HANDS = _number("MAX_HANDS", 1, int)

@@ -23,5 +23,5 @@ jobs:
         run: python -m pytest -q
       - name: Fit the fist thresholds on the fit split
         run: python tools/fit_fist.py
-      - name: Evaluate on the fit split
-        run: python tools/evaluate_gestures.py fit
+      - name: Evaluate on the held-out split
+        run: python tools/evaluate_gestures.py test
