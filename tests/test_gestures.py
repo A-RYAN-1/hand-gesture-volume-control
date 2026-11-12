@@ -28,7 +28,7 @@ def test_a_thumbs_up_is_not_a_fist():
 
 
 def test_one_straight_finger_is_enough_to_say_no():
-    tips = dict(CURLED_TIPS, **{8: STRAIGHT_TIPS[8]})
+    tips = {**CURLED_TIPS, 8: STRAIGHT_TIPS[8]}
     assert not is_fist(hand(tips, TUCKED_THUMB), 1.0, 0.8)
 
 
