@@ -52,3 +52,21 @@ def test_lock_key_longer_than_one_character_is_rejected(monkeypatch):
     monkeypatch.setenv("LOCK_KEY", "lock")
     with pytest.raises(SystemExit, match="LOCK_KEY"):
         importlib.reload(config)
+
+
+def test_calibrate_key_must_differ_from_the_lock_key(monkeypatch):
+    monkeypatch.setenv("CALIBRATE_KEY", "l")
+    with pytest.raises(SystemExit, match="CALIBRATE_KEY"):
+        importlib.reload(config)
+
+
+def test_mute_hold_must_be_at_least_one_frame(monkeypatch):
+    monkeypatch.setenv("MUTE_HOLD_FRAMES", "0")
+    with pytest.raises(SystemExit, match="MUTE_HOLD_FRAMES"):
+        importlib.reload(config)
+
+
+def test_calibration_file_can_be_moved(monkeypatch, tmp_path):
+    monkeypatch.setenv("CALIBRATION_FILE", str(tmp_path / "me.json"))
+    importlib.reload(config)
+    assert config.CALIBRATION_FILE == str(tmp_path / "me.json")

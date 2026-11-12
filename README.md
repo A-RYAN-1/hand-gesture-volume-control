@@ -2,7 +2,8 @@
 
 <p align="center">
   Change your Windows volume by pinching your thumb and index finger in front of the webcam.<br>
-  A live window draws the tracked hand and a volume bar while the system volume follows your fingers.
+  A live window draws the tracked hand and a volume bar while the system volume follows your fingers;<br>
+  hold a fist to mute, and calibrate the range to your own hand in five seconds.
 </p>
 
 <p align="center">
@@ -26,7 +27,7 @@
   <img src="docs/images/demo.jpg" width="60%" alt="The preview window: tracked hand landmarks, a magenta line between thumb and index finger, and a green volume bar at 75 percent">
 </p>
 
-<p align="center"><sub>Last updated: 2026-11-06 &middot; Runs locally on Windows (checked 2026-10-17); no hosted version, it needs your webcam and speakers</sub></p>
+<p align="center"><sub>Last updated: 2026-11-12 &middot; Runs locally on Windows (checked 2026-10-17); no hosted version, it needs your webcam and speakers</sub></p>
 
 ---
 
@@ -60,7 +61,9 @@ Not deployed yet, and it cannot be: the program needs your webcam and your Windo
 1. Run `python handdetect.py`; a window titled "Hand" opens with your camera feed.
 2. Hold one hand in view. Dots and lines appear on it, with a magenta line between thumb tip and index tip.
 3. Pinch and spread your fingers. The green bar and the percentage follow, and so does the Windows volume.
-4. Press Esc to quit.
+4. Press `C` and open and close the pinch fully for five seconds: your own range is saved and used from now on.
+5. Close your hand into a fist and hold it for a moment: the volume mutes and the window shows MUTED. Hold a fist again to unmute.
+6. Press Esc to quit.
 
 <table>
   <tr>
@@ -76,9 +79,11 @@ Not deployed yet, and it cannot be: the program needs your webcam and your Windo
   - Linear between two ratios you can change (default 0.15 and 1.0); below the lower one the volume is 0%, above the upper one it is 100%.
 - **Smoothed volume**: the pinch ratio goes through an exponential moving average (weight `SMOOTHING_ALPHA`, default 0.4), so landmark jitter does not shake the volume; the average restarts when the hand leaves the frame.
 - **Volume lock**: press `L` (change with `LOCK_KEY`) with the preview window focused to freeze the volume at its current value, so you can lower your hand during a call or a film; the window shows LOCKED and the hand is still drawn. Press the key again to follow your pinch again.
+- **Calibration to your hand**: press `C` (change with `CALIBRATE_KEY`) and open and close the pinch for 5 seconds; the 5th and 95th percentiles of your pinch become 0% and 100%, so a small hand or a stiff thumb still reaches both ends. Saved to `~/.hand-gesture-volume-control/calibration.json` (`CALIBRATION_FILE`) and loaded at start; refused with a reason when fewer than 30 frames had a hand or the pinch barely moved.
+- **Fist to mute**: a fist held for 10 frames (about a third of a second, `MUTE_HOLD_FRAMES`) toggles mute once; release it before it can toggle again. While a fist is forming the volume holds still, so closing the hand does not first drag the volume to 0. Measured on 3,223 held-out hands: precision 0.934, recall 0.785 (see *Engineering quality*).
 - **Live feedback**: the window shows the tracked hand, the pinch line and a volume bar with a percentage.
 - **Mirrored preview**: the image is flipped so moving your hand right moves it right on screen.
-- **Tunable by environment variables**: camera index, pinch ratios, lock key, hands to track and detection confidence.
+- **Tunable by environment variables**: camera index, pinch ratios, lock and calibration keys, fist thresholds and hold, hands to track and detection confidence.
 - **Clean exit**: Esc closes the window and releases the camera.
 
 ## Why it exists
@@ -95,8 +100,11 @@ flowchart LR
     Flip --> MP["MediaPipe Hands: 21 landmarks"]
     MP --> Dist["Pinch ratio: thumb tip 4 to index tip 8, over wrist 0 to middle knuckle 9"]
     Dist --> Smooth["Moving average"]
-    Smooth --> Map["mapping.py: ratio to percent to decibels"]
+    Smooth --> Map["mapping.py: ratio to percent to decibels, over your calibrated range"]
     Map --> Audio["pycaw: Windows endpoint volume"]
+    MP --> Fist["gestures.py: fist from finger extension and thumb reach"]
+    Fist --> Hold["held 10 frames?"]
+    Hold --> Mute["pycaw: toggle mute"]
     MP --> Draw["Draw hand, line and volume bar"]
     Draw --> Win["Preview window"]
 ```
@@ -119,7 +127,7 @@ sequenceDiagram
     L->>L: draw bar and show window
 ```
 
-When no hand is in view the volume is left alone; it only changes while a hand is tracked.
+When no hand is in view the volume is left alone; it only changes while a hand is tracked and no fist is forming.
 
 ### Tech stack
 
@@ -139,7 +147,9 @@ When no hand is in view the volume is left alone; it only changes while a hand i
 3. **Windows volume is set in decibels, not percent.** The device reports its own decibel range, and the percentage is interpolated onto it, so 50% on screen is halfway in decibels. Trade-off: perceived loudness is not linear in decibels, so the middle can feel loud.
 4. **Pinch measured against hand size, not pixels.** The same pinch is twice as many pixels at half the distance, so the distance is divided by the wrist to middle-knuckle length from the same frame. Trade-off: a hand turned edge-on shortens that reference in 2D and raises the ratio; MediaPipe's depth value is not used.
 5. **Moving average, not a filter library.** One line of arithmetic, one setting. Trade-off: lag grows as the weight falls; at 0.4 a step reaches 90% in 5 frames. A median or Kalman filter would cost more code for a small tool.
-6. **pycaw current API.** Newer pycaw returns a device object with an `EndpointVolume` property; the old `Activate(...)` call fails with `AttributeError`. The code uses the new one, and `requirements.txt` pins pycaw so it stays that way.
+6. **A fist from two measured ratios, not a trained network.** For each of the four fingers, the wrist-to-tip distance over the wrist-to-middle-joint distance (a curled finger drops to about 1 or below), and the thumb tip's distance from the middle knuckle over the hand size (a thumbs-up reaches far). Both thresholds are fitted by grid search on one split of HaGRID's recorded hands, maximising F0.5 so precision counts twice as much as recall (an unwanted mute is worse than a second try), and reported once on a held-out split. Trade-off: two numbers can be read and checked, but they miss fists seen from unusual angles (recall 0.785).
+7. **Percentiles for calibration.** The 5th and 95th percentiles of the recorded pinch, not the minimum and maximum, so one wrong landmark frame does not stretch the range. Trade-off: the extreme 5% at each end clamps to 0% and 100%.
+8. **pycaw current API.** Newer pycaw returns a device object with an `EndpointVolume` property; the old `Activate(...)` call fails with `AttributeError`. The code uses the new one, and `requirements.txt` pins pycaw so it stays that way.
 
 <details>
 <summary><strong>Project structure</strong></summary>
@@ -147,9 +157,18 @@ When no hand is in view the volume is left alone; it only changes while a hand i
 ```
 handdetect.py        webcam loop, hand tracking, drawing, volume call
 tools/measure_jitter.py jitter and lag before and after smoothing, on synthetic noise
+tools/fit_fist.py    fits the two fist thresholds on data/hagrid-fit.json.gz
+tools/evaluate_gestures.py  fist precision and recall on held-out hands, or on your own recording
+tools/record_landmarks.py   records your own labelled hands (landmarks only, never a picture)
+tools/build_hagrid_set.py   rebuilds data/ from the HaGRID annotation files
 mapping.py           pinch ratio (pinch over hand size) to percent to decibels (pure functions)
+gestures.py          fist features, the fist test and the hold-frames guardrail (pure)
+calibration.py       per-user range from percentiles, the saved profile (pure)
+lock.py              the volume lock (pure)
+data/                recorded HaGRID hands, labels and landmarks only (CC BY-SA 4.0, see data/README.md)
 config.py            every setting, read from environment variables
-tests/               unit tests for mapping.py
+tests/               unit tests for every pure module and the classifier's held-out floor
+.github/workflows/   CI: tests, the fit and the held-out evaluation
 docs/images/         screenshots
 mise.toml            Python version pin
 requirements.txt     runtime dependencies, versions pinned
@@ -162,11 +181,12 @@ requirements.txt     runtime dependencies, versions pinned
 
 | Area | What is in place |
 |---|---|
-| Tests | 26 pytest cases (2026-10-22): the ratio-to-volume conversion (clamping, linearity, device range), the same pose at four scales giving the same volume, a zero hand size, smoothing, and config validation; none need a webcam |
+| Tests | 61 pytest cases in CI on every pull request (2026-11-12): the ratio-to-volume conversion, scale invariance, smoothing, the lock, calibration percentiles and refusals, the saved profile, the fist features against thumbs-up and one-finger look-alikes, the hold and release rule, and config validation; none need a webcam |
+| Fist classifier | fitted on HaGRID's `ann_subsample` hands (2,482, of which 96 fists) and reported on a held-out sample of `ann_test` (3,223 hands from photos not in the fit set, 144 fists), 2026-11-12 in CI: **precision 0.934, recall 0.785** (113 found, 8 false, 31 missed). Other hands taken for a fist: thumbs-down 2.0%, thumbs-up 1.4%, pointing 0.7%, hands at rest (`no_gesture`, 540) 0.4%, every other gesture 0%. A CI test fails if precision drops below 0.90, recall below 0.75 or the resting rate above 2% |
 | Jitter | `python tools/measure_jitter.py` on a synthetic held pinch with Gaussian landmark noise (3000 frames, seed 7, 2026-10-22): jitter 3.50 volume points with smoothing off, 1.79 at the default (49% lower); a step to 100% reaches 90% after 1 frame off, 5 frames at the default. Synthetic, not measured on a webcam |
 | Startup check | on 2026-10-17 the app opened the camera and the speaker endpoint and ran 10 seconds without error on Windows 11 |
 | Configuration | every value from environment variables with a clear error for a bad one; no secrets are involved |
-| Not covered | the hand tracking itself and the live volume change are checked by hand, not by tests, and the hand-size change (2026-10-22) has not been run on a webcam; there is no CI |
+| Not covered | the hand tracking, the live volume change, calibration and mute on a real webcam are not checked yet; the classifier's numbers come from photos, not webcam video |
 
 Run the tests:
 
@@ -200,7 +220,8 @@ soon as it sees a hand.
 - `AttributeError: 'AudioDevice' object has no attribute 'Activate'`: you are running an old copy of the script against a new pycaw; use this repository's `handdetect.py`.
 - `Cannot open camera 0; set the CAMERA_INDEX environment variable`: another program holds the camera, or the camera is not index 0; close the other program or set `CAMERA_INDEX=1`.
 - `No matching distribution found for mediapipe==0.10.21`: your Python is newer than 3.12; use the pinned version.
-- You cannot reach 100%, or 0% is hard to hit: lower `PINCH_MAX_RATIO` or raise `PINCH_MIN_RATIO`; the defaults are first estimates.
+- You cannot reach 100%, or 0% is hard to hit: press `C` to calibrate to your hand (or set `PINCH_MAX_RATIO` and `PINCH_MIN_RATIO`).
+- The volume mutes when you did not mean it: raise `MUTE_HOLD_FRAMES`, or lower `FIST_MAX_EXTENSION`; record your own hands with `tools/record_landmarks.py` and check them with `tools/evaluate_gestures.py <file>`.
 
 </details>
 
@@ -212,10 +233,16 @@ the ones you change (for example `export CAMERA_INDEX=1` in Git Bash before runn
 | Variable | What it is | Default |
 |---|---|---|
 | `CAMERA_INDEX` | which camera to open | `0` |
-| `PINCH_MIN_RATIO` | thumb-to-index distance as a fraction of hand size meaning 0% | `0.15` |
+| `PINCH_MIN_RATIO` | thumb-to-index distance as a fraction of hand size meaning 0% (a calibration replaces it) | `0.15` |
 | `PINCH_MAX_RATIO` | thumb-to-index distance as a fraction of hand size meaning 100% | `1.0` |
 | `SMOOTHING_ALPHA` | weight of the newest frame in the smoothed pinch, above 0 to 1 (1 is off) | `0.4` |
 | `LOCK_KEY` | single key that locks and unlocks the volume | `l` |
+| `CALIBRATE_KEY` | single key that starts a calibration (not the lock key) | `c` |
+| `CALIBRATION_SECONDS` | how long a calibration records | `5` |
+| `CALIBRATION_FILE` | where your calibrated range is saved and read at start | `~/.hand-gesture-volume-control/calibration.json` |
+| `FIST_MAX_EXTENSION` | largest finger extension still counted as curled (fitted) | `0.77` |
+| `FIST_MAX_THUMB_REACH` | furthest thumb reach still counted as tucked in (fitted) | `0.56` |
+| `MUTE_HOLD_FRAMES` | frames in a row a fist must be held to toggle mute | `10` |
 | `MAX_HANDS` | hands to look for (the first one controls the volume) | `1` |
 | `DETECTION_CONFIDENCE` | MediaPipe detection threshold, 0 to 1 | `0.5` |
 
@@ -237,11 +264,13 @@ is nothing to host. The realistic "release" is this repository run locally.
 - Tested by hand with one hand and one camera; the pinch is relative to hand size, but a hand turned edge-on to the camera reads as a wider pinch, and the 0.15 and 1.0 defaults have not been tuned on a live webcam.
 - The first hand MediaPipe reports controls the volume, left or right.
 - Smoothing is verified on synthetic noise only; the real jitter of your webcam and hand has not been measured.
-- No CI.
+- The fist classifier is measured on photos (HaGRID), whose image size is not recorded, so distance ratios carry the photo's aspect; false mutes per minute of webcam video are not measured. `tools/record_landmarks.py idle 60 me.jsonl` and `tools/evaluate_gestures.py me.jsonl` give that number for your own camera.
+- About one fist in five is missed (recall 0.785); holding the fist square to the camera should help, which is not yet measured.
 
 **Planned**
 
-- [ ] A key to lock the volume while the hand moves away.
+- [ ] Measure false mutes per minute on a recorded webcam session.
+- [ ] A second gesture for play and pause.
 
 ## Credits
 
