@@ -31,6 +31,11 @@ FIST_MAX_EXTENSION = _number("FIST_MAX_EXTENSION", 0.77)
 FIST_MAX_THUMB_REACH = _number("FIST_MAX_THUMB_REACH", 0.56)
 # Frames in a row a fist must be held before it toggles mute (about a third of a second at 30 frames a second).
 MUTE_HOLD_FRAMES = _number("MUTE_HOLD_FRAMES", 10, int)
+# Background mode: no preview window; Ctrl+Alt plus the lock, calibrate and quit keys work from any window,
+# and a small indicator shows the volume for INDICATOR_SECONDS after it changes. Also set by --background.
+BACKGROUND = (os.environ.get("BACKGROUND") or "").lower() in ("1", "true", "yes")
+QUIT_KEY = os.environ.get("QUIT_KEY") or "q"
+INDICATOR_SECONDS = _number("INDICATOR_SECONDS", 2.0)
 MAX_HANDS = _number("MAX_HANDS", 1, int)
 DETECTION_CONFIDENCE = _number("DETECTION_CONFIDENCE", 0.5)
 
@@ -42,6 +47,12 @@ if len(LOCK_KEY) != 1:
     raise SystemExit("LOCK_KEY must be a single character")
 if len(CALIBRATE_KEY) != 1 or CALIBRATE_KEY == LOCK_KEY:
     raise SystemExit("CALIBRATE_KEY must be a single character other than LOCK_KEY")
+if not (len(QUIT_KEY) == 1 and QUIT_KEY.isalnum() and QUIT_KEY not in (LOCK_KEY, CALIBRATE_KEY)):
+    raise SystemExit("QUIT_KEY must be one letter or digit other than LOCK_KEY and CALIBRATE_KEY")
+if not (LOCK_KEY.isalnum() and CALIBRATE_KEY.isalnum()):
+    raise SystemExit("LOCK_KEY and CALIBRATE_KEY must be a letter or digit so they can be Ctrl+Alt hotkeys")
+if INDICATOR_SECONDS <= 0:
+    raise SystemExit("INDICATOR_SECONDS must be above 0")
 if CALIBRATION_SECONDS <= 0:
     raise SystemExit("CALIBRATION_SECONDS must be above 0")
 if FIST_MAX_EXTENSION <= 0 or FIST_MAX_THUMB_REACH <= 0:

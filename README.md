@@ -27,7 +27,7 @@
   <img src="docs/images/demo.jpg" width="60%" alt="The preview window: tracked hand landmarks, a magenta line between thumb and index finger, and a green volume bar at 75 percent">
 </p>
 
-<p align="center"><sub>Last updated: 2026-11-12 &middot; Runs locally on Windows (checked 2026-10-17); no hosted version, it needs your webcam and speakers</sub></p>
+<p align="center"><sub>Last updated: 2026-11-14 &middot; Runs locally on Windows (checked 2026-10-17); no hosted version, it needs your webcam and speakers</sub></p>
 
 ---
 
@@ -64,11 +64,15 @@ Not deployed yet, and it cannot be: the program needs your webcam and your Windo
 4. Press `C` and open and close the pinch fully for five seconds: your own range is saved and used from now on.
 5. Close your hand into a fist and hold it for a moment: the volume mutes and the window shows MUTED. Hold a fist again to unmute.
 6. Press Esc to quit.
+7. For daily use, run `python handdetect.py --background`: no window opens, a small indicator in the bottom-right corner shows the volume for two seconds after it changes, and `Ctrl+Alt+L`, `Ctrl+Alt+C` and `Ctrl+Alt+Q` lock, calibrate and quit from any window. `python tools/startup.py install` starts it hidden at every Windows sign-in (`remove` undoes it).
 
 <table>
   <tr>
     <td width="50%"><img src="docs/images/demo.jpg" alt="Hand tracked with the volume bar at 75 percent"><p align="center"><sub>The preview window while running (<a href="#how-it-works">how it works</a>)</sub></p></td>
     <td width="50%"><img src="docs/images/hand-landmarks.jpg" alt="MediaPipe's 21 hand landmarks, numbered"><p align="center"><sub>The 21 landmarks MediaPipe returns; the code uses 0, 4, 8 and 9 (<a href="#how-it-works">how it works</a>)</sub></p></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/images/indicator.png" alt="The background-mode indicator in three states: Volume 75 percent, Volume 30 percent LOCKED, and Volume 0 percent LOCKED MUTED, white text on a dark box"><p align="center"><sub>Background mode: the indicator that replaces the preview window, captured 2026-11-14 (<a href="#features">features</a>)</sub></p></td>
   </tr>
 </table>
 
@@ -81,6 +85,7 @@ Not deployed yet, and it cannot be: the program needs your webcam and your Windo
 - **Volume lock**: press `L` (change with `LOCK_KEY`) with the preview window focused to freeze the volume at its current value, so you can lower your hand during a call or a film; the window shows LOCKED and the hand is still drawn. Press the key again to follow your pinch again.
 - **Calibration to your hand**: press `C` (change with `CALIBRATE_KEY`) and open and close the pinch for 5 seconds; the 5th and 95th percentiles of your pinch become 0% and 100%, so a small hand or a stiff thumb still reaches both ends. Saved to `~/.hand-gesture-volume-control/calibration.json` (`CALIBRATION_FILE`) and loaded at start; refused with a reason when fewer than 30 frames had a hand or the pinch barely moved.
 - **Fist to mute**: a fist held for 10 frames (about a third of a second, `MUTE_HOLD_FRAMES`) toggles mute once; release it before it can toggle again. While a fist is forming the volume holds still, so closing the hand does not first drag the volume to 0. Measured on 3,223 held-out hands: precision 0.934, recall 0.785 (see *Engineering quality*).
+- **Background mode** (`--background` or `BACKGROUND=1`): no preview window; a small always-on-top box in the bottom-right corner shows the volume, LOCKED and MUTED for `INDICATOR_SECONDS` after any change and hides itself. `Ctrl+Alt` plus the lock key, the calibrate key or `QUIT_KEY` (default `q`) work from any window; only those three keys and the two modifiers are ever read. `python tools/startup.py install|remove|status` manages a hidden script in the Windows Startup folder. The camera stays on while it runs.
 - **Live feedback**: the window shows the tracked hand, the pinch line and a volume bar with a percentage.
 - **Mirrored preview**: the image is flipped so moving your hand right moves it right on screen.
 - **Tunable by environment variables**: camera index, pinch ratios, lock and calibration keys, fist thresholds and hold, hands to track and detection confidence.
@@ -181,9 +186,10 @@ requirements.txt     runtime dependencies, versions pinned
 
 | Area | What is in place |
 |---|---|
-| Tests | 61 pytest cases in CI on every pull request (2026-11-12): the ratio-to-volume conversion, scale invariance, smoothing, the lock, calibration percentiles and refusals, the saved profile, the fist features against thumbs-up and one-finger look-alikes, the hold and release rule, and config validation; none need a webcam |
+| Tests | 75 pytest cases in CI on every pull request (2026-11-12): the ratio-to-volume conversion, scale invariance, smoothing, the lock, calibration percentiles and refusals, the saved profile, the fist features against thumbs-up and one-finger look-alikes, the hold and release rule, and config validation; none need a webcam |
 | Fist classifier | fitted on HaGRID's `ann_subsample` hands (2,482, of which 96 fists) and reported on a held-out sample of `ann_test` (3,223 hands from photos not in the fit set, 144 fists), 2026-11-12 in CI: **precision 0.934, recall 0.785** (113 found, 8 false, 31 missed). Other hands taken for a fist: thumbs-down 2.0%, thumbs-up 1.4%, pointing 0.7%, hands at rest (`no_gesture`, 540) 0.4%, every other gesture 0%. A CI test fails if precision drops below 0.90, recall below 0.75 or the resting rate above 2% |
 | Jitter | `python tools/measure_jitter.py` on a synthetic held pinch with Gaussian landmark noise (3000 frames, seed 7, 2026-10-22): jitter 3.50 volume points with smoothing off, 1.79 at the default (49% lower); a step to 100% reaches 90% after 1 frame off, 5 frames at the default. Synthetic, not measured on a webcam |
+| Background run | on 2026-11-14, on Windows 11 with a real webcam, `--background` ran 8 seconds with no "Hand" window and `Ctrl+Alt+Q` (sent by a script) ended it in 0.4 seconds with exit code 0; the indicator window was checked on its own (bottom-right, always on top, shows and hides); `tools/startup.py` install, status and remove were run once. No sign-in restart was done and no hand was in view, so volume changes in background mode are not checked live |
 | Startup check | on 2026-10-17 the app opened the camera and the speaker endpoint and ran 10 seconds without error on Windows 11 |
 | Configuration | every value from environment variables with a clear error for a bad one; no secrets are involved |
 | Not covered | the hand tracking, the live volume change, calibration and mute on a real webcam are not checked yet; the classifier's numbers come from photos, not webcam video |
@@ -236,13 +242,16 @@ the ones you change (for example `export CAMERA_INDEX=1` in Git Bash before runn
 | `PINCH_MIN_RATIO` | thumb-to-index distance as a fraction of hand size meaning 0% (a calibration replaces it) | `0.15` |
 | `PINCH_MAX_RATIO` | thumb-to-index distance as a fraction of hand size meaning 100% | `1.0` |
 | `SMOOTHING_ALPHA` | weight of the newest frame in the smoothed pinch, above 0 to 1 (1 is off) | `0.4` |
-| `LOCK_KEY` | single key that locks and unlocks the volume | `l` |
-| `CALIBRATE_KEY` | single key that starts a calibration (not the lock key) | `c` |
+| `LOCK_KEY` | single letter or digit that locks and unlocks the volume | `l` |
+| `CALIBRATE_KEY` | single letter or digit that starts a calibration (not the lock key) | `c` |
 | `CALIBRATION_SECONDS` | how long a calibration records | `5` |
 | `CALIBRATION_FILE` | where your calibrated range is saved and read at start | `~/.hand-gesture-volume-control/calibration.json` |
 | `FIST_MAX_EXTENSION` | largest finger extension still counted as curled (fitted) | `0.77` |
 | `FIST_MAX_THUMB_REACH` | furthest thumb reach still counted as tucked in (fitted) | `0.56` |
 | `MUTE_HOLD_FRAMES` | frames in a row a fist must be held to toggle mute | `10` |
+| `BACKGROUND` | `1` runs without the preview window (same as `--background`) | `0` |
+| `QUIT_KEY` | letter or digit that quits in background mode with Ctrl+Alt (not the lock or calibrate key) | `q` |
+| `INDICATOR_SECONDS` | how long the background indicator stays after a change | `2` |
 | `MAX_HANDS` | hands to look for (the first one controls the volume) | `1` |
 | `DETECTION_CONFIDENCE` | MediaPipe detection threshold, 0 to 1 | `0.5` |
 
@@ -261,6 +270,7 @@ is nothing to host. The realistic "release" is this repository run locally.
 **Known limitations**
 
 - Windows only.
+- Background mode started from the Startup folder has no console, so a start-up error (no camera, wrong camera index) shows nothing; run `python handdetect.py --background` once in a terminal to see it. Its CPU use was not measured.
 - Tested by hand with one hand and one camera; the pinch is relative to hand size, but a hand turned edge-on to the camera reads as a wider pinch, and the 0.15 and 1.0 defaults have not been tuned on a live webcam.
 - The first hand MediaPipe reports controls the volume, left or right.
 - Smoothing is verified on synthetic noise only; the real jitter of your webcam and hand has not been measured.
@@ -269,6 +279,7 @@ is nothing to host. The realistic "release" is this repository run locally.
 
 **Planned**
 
+- [x] Background mode with an indicator, global hotkeys and a start-with-Windows option (2026-11-14).
 - [ ] Measure false mutes per minute on a recorded webcam session.
 - [ ] A second gesture for play and pause.
 

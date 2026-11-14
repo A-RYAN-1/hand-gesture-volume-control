@@ -1,4 +1,5 @@
 """Control the Windows master volume with the thumb-to-index pinch seen by the webcam; a held fist mutes."""
+import sys
 import time
 
 import cv2
@@ -7,6 +8,7 @@ from pycaw.pycaw import AudioUtilities
 
 import calibration
 import config
+from background import HotkeyPoller, Indicator, ShowFor, indicator_text, virtual_key
 from gestures import GestureHold, is_fist
 from lock import VolumeLock
 from mapping import THUMB_TIP, INDEX_TIP, pinch_ratio, pinch_to_percent, percent_to_decibel, smooth
@@ -46,6 +48,7 @@ def open_volume_control():
 
 
 def main():
+    background = config.BACKGROUND or "--background" in sys.argv[1:]
     cap = cv2.VideoCapture(config.CAMERA_INDEX)
     if not cap.isOpened():
         raise SystemExit(f"Cannot open camera {config.CAMERA_INDEX}; set the CAMERA_INDEX environment variable")
@@ -59,6 +62,10 @@ def main():
     session = None
     notice, notice_until = "", 0.0
     fist = GestureHold(config.MUTE_HOLD_FRAMES)
+    if background:
+        hotkeys = HotkeyPoller({"lock": virtual_key(config.LOCK_KEY), "calibrate": virtual_key(config.CALIBRATE_KEY),
+                                "quit": virtual_key(config.QUIT_KEY)})
+        indicator, show_for = Indicator(), ShowFor(config.INDICATOR_SECONDS)
     try:
         while True:
             ok, frame = cap.read()
@@ -113,18 +120,36 @@ def main():
                             cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 0), 2)
             elif now < notice_until:
                 cv2.putText(frame, notice[:60], (40, 130), cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 0), 2)
-            cv2.imshow("Hand", frame)
-            key = cv2.waitKey(1)
-            if key == ESC:
+            if background:
+                actions = hotkeys.poll()
+                if session is not None:
+                    text = f"Calibrating {session.remaining(now):.0f}s: open and close the pinch"
+                elif now < notice_until:
+                    text = notice
+                else:
+                    text = indicator_text(percent, lock.locked, volume.GetMute())
+                if show_for.visible(text, now):
+                    indicator.show(text)
+                else:
+                    indicator.hide()
+                indicator.pump()
+            else:
+                cv2.imshow("Hand", frame)
+                key = cv2.waitKey(1)
+                actions = [name for name, wanted in (("quit", ESC), ("lock", ord(config.LOCK_KEY)),
+                                                     ("calibrate", ord(config.CALIBRATE_KEY))) if key == wanted]
+            if "quit" in actions:
                 break
-            if key == ord(config.LOCK_KEY):
+            if "lock" in actions:
                 lock.toggle(percent)
                 smoothed = None
-            if key == ord(config.CALIBRATE_KEY) and session is None:
+            if "calibrate" in actions and session is None:
                 session = calibration.CalibrationSession(time.monotonic(), config.CALIBRATION_SECONDS)
     finally:
         cap.release()
         cv2.destroyAllWindows()
+        if background:
+            indicator.close()
 
 
 if __name__ == "__main__":
