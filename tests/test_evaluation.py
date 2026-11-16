@@ -17,3 +17,15 @@ def test_fist_classifier_keeps_its_held_out_numbers():
     assert r["precision"] >= 0.90
     assert r["recall"] >= 0.75
     assert r["taken_for_fist"]["no_gesture"] <= 0.02
+
+
+def test_palm_classifier_keeps_its_held_out_numbers():
+    """Measured 2026-11-16 (CI run 43905261892) with the thresholds fitted on the fit split: precision 0.644,
+    recall 0.751; idle (`no_gesture`) hands 0.267 and `four` 0.260 taken for an open palm. A single photo of
+    a relaxed open hand looks like a palm, which is why play/pause also needs the hand held still."""
+    from evaluate_gestures import evaluate_palm
+
+    r = evaluate_palm(gesture_data.load("test"))
+    assert r["precision"] >= 0.58
+    assert r["recall"] >= 0.68
+    assert r["taken_for_palm"]["no_gesture"] <= 0.32
