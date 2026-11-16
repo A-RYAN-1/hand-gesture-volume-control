@@ -18,11 +18,16 @@ def load(name):
 
 
 def scores(predicted, labels, positive="fist"):
-    """Precision, recall and the false positive rate for one class, from parallel lists."""
-    tp = sum(p and l == positive for p, l in zip(predicted, labels))
-    fp = sum(p and l != positive for p, l in zip(predicted, labels))
-    fn = sum((not p) and l == positive for p, l in zip(predicted, labels))
-    negatives = sum(l != positive for l in labels)
+    """Precision, recall and the false positive rate for one class, from parallel lists.
+
+    `positive` is one label or a collection of labels that all count as the class (the open hand is `palm`,
+    `stop` and `stop_inverted` in HaGRID).
+    """
+    positives = {positive} if isinstance(positive, str) else set(positive)
+    tp = sum(p and l in positives for p, l in zip(predicted, labels))
+    fp = sum(p and l not in positives for p, l in zip(predicted, labels))
+    fn = sum((not p) and l in positives for p, l in zip(predicted, labels))
+    negatives = sum(l not in positives for l in labels)
     return {
         "precision": tp / (tp + fp) if tp + fp else 0.0,
         "recall": tp / (tp + fn) if tp + fn else 0.0,

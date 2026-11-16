@@ -70,3 +70,18 @@ def test_calibration_file_can_be_moved(monkeypatch, tmp_path):
     monkeypatch.setenv("CALIBRATION_FILE", str(tmp_path / "me.json"))
     importlib.reload(config)
     assert config.CALIBRATION_FILE == str(tmp_path / "me.json")
+
+
+@pytest.mark.parametrize("name, value", [("PALM_HOLD_FRAMES", "0"), ("PALM_STILL_MOVE", "0"),
+                                         ("PALM_MIN_EXTENSION", "0"), ("PALM_MIN_THUMB_EXTENSION", "-1")])
+def test_bad_palm_settings_are_rejected(monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
+    with pytest.raises(SystemExit, match=name):
+        importlib.reload(config)
+
+
+def test_play_pause_is_on_by_default_and_can_be_turned_off(monkeypatch):
+    assert config.PALM_PLAY_PAUSE is True
+    monkeypatch.setenv("PALM_PLAY_PAUSE", "0")
+    importlib.reload(config)
+    assert config.PALM_PLAY_PAUSE is False

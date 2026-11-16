@@ -4,9 +4,10 @@
   python tools/record_landmarks.py idle 60 me.jsonl        use the computer as usual for a minute
   python tools/evaluate_gestures.py me.jsonl
 
-Each line of the output is {"label": ..., "lm": 21 [x, y] pairs as fractions of the frame}, appended, so one
-file collects several recordings. Label the recordings of anything that is not a fist with any other word;
-a minute of `idle` frames gives a per-frame false mute rate for your own camera and desk.
+Each line of the output is {"label": ..., "t": seconds since the recording began, "lm": 21 [x, y] pairs as
+fractions of the frame}, appended, so one file collects several recordings. Label the recordings of anything that is not a fist with any other word;
+a minute of `idle` frames gives a per-frame false mute rate for your own camera and desk, and
+tools/replay_false_triggers.py turns it into false play/pause and mute triggers per minute.
 """
 import json
 import os
@@ -25,7 +26,8 @@ def main(label, seconds, out):
     if not cap.isOpened():
         raise SystemExit(f"Cannot open camera {config.CAMERA_INDEX}; set the CAMERA_INDEX environment variable")
     tracker = HandTracker()
-    ends, frames, kept = time.monotonic() + seconds, 0, 0
+    began = time.monotonic()
+    ends, frames, kept = began + seconds, 0, 0
     try:
         with open(out, "a", encoding="utf-8") as f:
             while time.monotonic() < ends:
@@ -35,7 +37,9 @@ def main(label, seconds, out):
                 frames += 1
                 hand = tracker.first_hand(cv2.flip(frame, 1))
                 if hand is not None:
-                    f.write(json.dumps({"label": label, "lm": [[round(p.x, 4), round(p.y, 4)] for p in hand.landmark]}) + "\n")
+                    row = {"label": label, "t": round(time.monotonic() - began, 3),
+                           "lm": [[round(p.x, 4), round(p.y, 4)] for p in hand.landmark]}
+                    f.write(json.dumps(row) + "\n")
                     kept += 1
     finally:
         cap.release()

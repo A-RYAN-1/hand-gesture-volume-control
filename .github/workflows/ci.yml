@@ -25,3 +25,7 @@ jobs:
         run: python tools/fit_fist.py
       - name: Evaluate on the held-out split
         run: python tools/evaluate_gestures.py test
+      - name: Fit the open-palm thresholds on the fit split
+        run: python tools/fit_palm.py
+      - name: Open-palm measurements per label on the fit split
+        run: python tools/palm_diagnostics.py

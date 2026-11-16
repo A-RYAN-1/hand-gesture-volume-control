@@ -13,8 +13,9 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.dirname(__file__))
 import config  # noqa: E402
-from gestures import is_fist  # noqa: E402
+from gestures import is_fist, is_palm  # noqa: E402
 import gesture_data  # noqa: E402
+from fit_palm import PALM_LABELS  # noqa: E402
 
 
 def evaluate(rows, max_extension=None, max_thumb_reach=None):
@@ -32,6 +33,22 @@ def evaluate(rows, max_extension=None, max_thumb_reach=None):
     return result
 
 
+def evaluate_palm(rows, min_extension=None, min_thumb_extension=None):
+    """The same report for the open palm (HaGRID `palm`, `stop`, `stop_inverted`) with the thresholds in config.py."""
+    ext = config.PALM_MIN_EXTENSION if min_extension is None else min_extension
+    thumb = config.PALM_MIN_THUMB_EXTENSION if min_thumb_extension is None else min_thumb_extension
+    labels = [label for label, _ in rows]
+    predicted = [is_palm(points, ext, thumb) for _, points in rows]
+    result = gesture_data.scores(predicted, labels, positive=PALM_LABELS)
+    per_label = {}
+    for p, label in zip(predicted, labels):
+        hit, total = per_label.get(label, (0, 0))
+        per_label[label] = (hit + p, total + 1)
+    result["taken_for_palm"] = {label: hit / total for label, (hit, total) in sorted(per_label.items())}
+    result["hands"] = len(rows)
+    return result
+
+
 def main(argv):
     name = argv[0] if argv else "test"
     r = evaluate(gesture_data.load(name))
@@ -40,6 +57,13 @@ def main(argv):
     print("share of each label taken for a fist:")
     for label, share in r["taken_for_fist"].items():
         print(f"  {label:<16} {share:.3f}")
+    palm = evaluate_palm(gesture_data.load(name))
+    if palm["tp"] + palm["fn"]:
+        print(f"open palm (thresholds extension {config.PALM_MIN_EXTENSION}, thumb extension {config.PALM_MIN_THUMB_EXTENSION}):")
+        print(f"palm precision {palm['precision']:.3f}  recall {palm['recall']:.3f}  (tp {palm['tp']}, fp {palm['fp']}, fn {palm['fn']})")
+        print("share of each label taken for an open palm:")
+        for label, share in palm["taken_for_palm"].items():
+            print(f"  {label:<16} {share:.3f}")
 
 
 if __name__ == "__main__":
