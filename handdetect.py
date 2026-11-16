@@ -1,4 +1,4 @@
-"""Control the Windows master volume with the thumb-to-index pinch seen by the webcam; a held fist mutes."""
+"""Control the Windows master volume with the thumb-to-index pinch seen by the webcam; a held fist mutes and a still open palm sends play/pause."""
 import sys
 import time
 
@@ -8,13 +8,15 @@ from pycaw.pycaw import AudioUtilities
 
 import calibration
 import config
+import media
 from background import HotkeyPoller, Indicator, ShowFor, indicator_text, virtual_key
-from gestures import GestureHold, is_fist
+from gestures import GestureHold, PalmHold, is_fist, is_palm
 from lock import VolumeLock
 from mapping import THUMB_TIP, INDEX_TIP, pinch_ratio, pinch_to_percent, percent_to_decibel, smooth
 
 ESC = 27
 NOTICE_SECONDS = 4  # how long the calibration result stays on screen
+PLAY_PAUSE_NOTICE_SECONDS = 1.5
 
 
 class HandTracker:
@@ -62,6 +64,7 @@ def main():
     session = None
     notice, notice_until = "", 0.0
     fist = GestureHold(config.MUTE_HOLD_FRAMES)
+    palm = PalmHold(config.PALM_HOLD_FRAMES, config.PALM_STILL_MOVE)
     if background:
         hotkeys = HotkeyPoller({"lock": virtual_key(config.LOCK_KEY), "calibrate": virtual_key(config.CALIBRATE_KEY),
                                 "quit": virtual_key(config.QUIT_KEY)})
@@ -82,10 +85,16 @@ def main():
                 fist_seen = session is None and is_fist(points, config.FIST_MAX_EXTENSION, config.FIST_MAX_THUMB_REACH)
                 if fist.update(fist_seen):  # no mute while a calibration sweeps the pinch
                     volume.SetMute(not volume.GetMute(), None)
+                palm_seen = (config.PALM_PLAY_PAUSE and session is None and not fist_seen
+                             and is_palm(points, config.PALM_MIN_EXTENSION, config.PALM_MIN_THUMB_REACH))
+                if palm.update(palm_seen, points if palm_seen else None):
+                    media.toggle_play_pause()
+                    notice, notice_until = "Play/pause", time.monotonic() + PLAY_PAUSE_NOTICE_SECONDS
                 if session is not None:
                     session.add(ratio)  # the volume stays put while the user sweeps the pinch
-                elif ratio is not None and not fist.forming:
-                    # a closing fist also closes the pinch: hold the volume until the hand opens again
+                elif ratio is not None and not fist.forming and not palm.forming:
+                    # a closing fist also closes the pinch, and an open palm is a fully open pinch: hold the
+                    # volume until the hand is neither
                     smoothed = smooth(smoothed, ratio, config.SMOOTHING_ALPHA)
                     live_percent = pinch_to_percent(smoothed, *pinch_range)
                     percent = lock.resolve(live_percent)
@@ -98,6 +107,7 @@ def main():
             else:
                 smoothed = None
                 fist.update(False)
+                palm.update(False)
             now = time.monotonic()
             if session is not None and session.done(now):
                 try:

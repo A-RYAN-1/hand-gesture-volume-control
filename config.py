@@ -29,6 +29,15 @@ CALIBRATION_FILE = os.environ.get("CALIBRATION_FILE") or os.path.join(
 # Fist (mute) thresholds, fitted by tools/fit_fist.py on the HaGRID fit split (2026-11-12); see gestures.py.
 FIST_MAX_EXTENSION = _number("FIST_MAX_EXTENSION", 0.77)
 FIST_MAX_THUMB_REACH = _number("FIST_MAX_THUMB_REACH", 0.56)
+# Open-palm (play and pause) thresholds, fitted by tools/fit_palm.py on the HaGRID fit split; see gestures.py.
+# Placeholders until the fit has run in CI.
+PALM_MIN_EXTENSION = _number("PALM_MIN_EXTENSION", 1.0)
+PALM_MIN_THUMB_REACH = _number("PALM_MIN_THUMB_REACH", 0.8)
+# Frames in a row the open palm must be held still, and how far the hand may drift in that time as a fraction
+# of the hand size, before play and pause is sent (30 frames is about a second). PALM_PLAY_PAUSE=0 turns it off.
+PALM_HOLD_FRAMES = _number("PALM_HOLD_FRAMES", 30, int)
+PALM_STILL_MOVE = _number("PALM_STILL_MOVE", 0.25)
+PALM_PLAY_PAUSE = (os.environ.get("PALM_PLAY_PAUSE") or "1").lower() not in ("0", "false", "no")
 # Frames in a row a fist must be held before it toggles mute (about a third of a second at 30 frames a second).
 MUTE_HOLD_FRAMES = _number("MUTE_HOLD_FRAMES", 10, int)
 # Background mode: no preview window; Ctrl+Alt plus the lock, calibrate and quit keys work from any window,
@@ -59,3 +68,9 @@ if FIST_MAX_EXTENSION <= 0 or FIST_MAX_THUMB_REACH <= 0:
     raise SystemExit("FIST_MAX_EXTENSION and FIST_MAX_THUMB_REACH must be above 0")
 if MUTE_HOLD_FRAMES < 1:
     raise SystemExit("MUTE_HOLD_FRAMES must be at least 1")
+if PALM_MIN_EXTENSION <= 0 or PALM_MIN_THUMB_REACH <= 0:
+    raise SystemExit("PALM_MIN_EXTENSION and PALM_MIN_THUMB_REACH must be above 0")
+if PALM_HOLD_FRAMES < 1:
+    raise SystemExit("PALM_HOLD_FRAMES must be at least 1")
+if PALM_STILL_MOVE <= 0:
+    raise SystemExit("PALM_STILL_MOVE must be above 0")

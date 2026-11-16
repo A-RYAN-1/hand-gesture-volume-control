@@ -20,8 +20,8 @@ def _distance(points, a, b):
     return math.hypot(points[b][1] - points[a][1], points[b][2] - points[a][2])
 
 
-def fist_features(points):
-    """(largest finger extension, thumb reach) for [id, x, y] points, or None when the hand is degenerate."""
+def _extensions_and_reach(points):
+    """([extension of each of the four fingers], thumb reach), or None when the hand is degenerate."""
     hand_size = _distance(points, WRIST, MIDDLE_MCP)
     if hand_size == 0:
         return None
@@ -31,7 +31,26 @@ def fist_features(points):
         if to_pip == 0:
             return None
         extensions.append(_distance(points, WRIST, tip) / to_pip)
-    return max(extensions), _distance(points, THUMB_TIP, MIDDLE_MCP) / hand_size
+    return extensions, _distance(points, THUMB_TIP, MIDDLE_MCP) / hand_size
+
+
+def fist_features(points):
+    """(largest finger extension, thumb reach) for [id, x, y] points, or None when the hand is degenerate."""
+    measured = _extensions_and_reach(points)
+    if measured is None:
+        return None
+    extensions, reach = measured
+    return max(extensions), reach
+
+
+def palm_features(points):
+    """(smallest finger extension, thumb reach), or None. The open palm is the mirror of the fist: the
+    smallest extension is high only when every finger is straight, and the thumb reaches out."""
+    measured = _extensions_and_reach(points)
+    if measured is None:
+        return None
+    extensions, reach = measured
+    return min(extensions), reach
 
 
 def is_fist(points, max_extension, max_thumb_reach):
@@ -41,6 +60,15 @@ def is_fist(points, max_extension, max_thumb_reach):
         return False
     extension, reach = features
     return extension <= max_extension and reach <= max_thumb_reach
+
+
+def is_palm(points, min_extension, min_thumb_reach):
+    """True when all four fingers are straight and the thumb is out: an open hand, seen from any side."""
+    features = palm_features(points)
+    if features is None:
+        return False
+    extension, reach = features
+    return extension >= min_extension and reach >= min_thumb_reach
 
 
 class GestureHold:
@@ -65,5 +93,41 @@ class GestureHold:
         if not active:
             self._count = 0
             return False
+        self._count += 1
+        return self._count == self.frames
+
+
+class PalmHold:
+    """Guardrail for the open palm: it acts only after `frames` frames in a row in which the hand stays still.
+
+    "Still" means the middle knuckle stays within `max_move` hand sizes of where it was when the hold began; a
+    hand that drifts further starts the count again from where it now is. Like GestureHold it fires once per
+    hold and has to be released (one frame without the palm) before it can act again.
+    """
+
+    def __init__(self, frames, max_move):
+        if frames < 1:
+            raise ValueError("frames must be at least 1")
+        if max_move <= 0:
+            raise ValueError("max_move must be above 0")
+        self.frames = frames
+        self.max_move = max_move
+        self._count = 0
+        self._anchor = None
+
+    @property
+    def forming(self):
+        """True while a palm is seen, from its first frame until it is released."""
+        return self._count > 0
+
+    def update(self, active, points=None):
+        """`points` are the hand's [id, x, y] landmarks; needed whenever `active` is True."""
+        if not active:
+            self._count, self._anchor = 0, None
+            return False
+        size = _distance(points, WRIST, MIDDLE_MCP)
+        centre = (points[MIDDLE_MCP][1], points[MIDDLE_MCP][2])
+        if self._anchor is None or math.hypot(centre[0] - self._anchor[0], centre[1] - self._anchor[1]) > self.max_move * size:
+            self._count, self._anchor = 0, centre
         self._count += 1
         return self._count == self.frames
