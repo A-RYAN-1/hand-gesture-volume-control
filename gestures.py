@@ -43,14 +43,28 @@ def fist_features(points):
     return max(extensions), reach
 
 
-def palm_features(points):
-    """(smallest finger extension, thumb reach), or None. The open palm is the mirror of the fist: the
-    smallest extension is high only when every finger is straight, and the thumb reaches out."""
+THUMB_MCP = 2
+
+
+def thumb_extension(points):
+    """Wrist-to-thumb-tip distance over wrist-to-thumb-base distance: well above 1 for a thumb held out
+    straight, near 1 for a thumb folded over the palm. None when the hand is degenerate."""
+    base = _distance(points, WRIST, THUMB_MCP)
+    return None if base == 0 else _distance(points, WRIST, THUMB_TIP) / base
+
+
+def palm_features(points, thumb="reach"):
+    """(smallest finger extension, thumb measure), or None. The open palm is the mirror of the fist: the
+    smallest extension is high only when every finger is straight, and the thumb is out. `thumb` picks the
+    thumb measure: "reach" (tip to middle knuckle over hand size) or "extension" (see thumb_extension)."""
     measured = _extensions_and_reach(points)
     if measured is None:
         return None
     extensions, reach = measured
-    return min(extensions), reach
+    if thumb == "reach":
+        return min(extensions), reach
+    out = thumb_extension(points)
+    return None if out is None else (min(extensions), out)
 
 
 def is_fist(points, max_extension, max_thumb_reach):
@@ -62,13 +76,13 @@ def is_fist(points, max_extension, max_thumb_reach):
     return extension <= max_extension and reach <= max_thumb_reach
 
 
-def is_palm(points, min_extension, min_thumb_reach):
+def is_palm(points, min_extension, min_thumb, thumb="reach"):
     """True when all four fingers are straight and the thumb is out: an open hand, seen from any side."""
-    features = palm_features(points)
+    features = palm_features(points, thumb)
     if features is None:
         return False
-    extension, reach = features
-    return extension >= min_extension and reach >= min_thumb_reach
+    extension, thumb_value = features
+    return extension >= min_extension and thumb_value >= min_thumb
 
 
 class GestureHold:

@@ -16,11 +16,14 @@ from fit_fist import f_beta  # noqa: E402
 
 PALM_LABELS = ("palm", "stop", "stop_inverted")
 EXTENSIONS = [round(0.80 + 0.01 * i, 2) for i in range(81)]   # 0.80 to 1.60
-REACHES = [round(0.20 + 0.01 * i, 2) for i in range(131)]     # 0.20 to 1.50
+REACHES = [round(0.20 + 0.01 * i, 2) for i in range(181)]     # 0.20 to 2.00 (covers both thumb measures)
 
 
-def fit(rows):
-    feats = [(label, palm_features(points)) for label, points in rows]
+THUMB_MEASURES = ("reach", "extension")
+
+
+def fit(rows, thumb="reach"):
+    feats = [(label, palm_features(points, thumb)) for label, points in rows]
     feats = [(label, f) for label, f in feats if f is not None]
     labels = [label for label, _ in feats]
     best = None
@@ -35,9 +38,11 @@ def fit(rows):
 
 
 def main():
-    (score, _), ext, reach, s = fit(gesture_data.load("fit"))
-    print(f"fit split: PALM_MIN_EXTENSION={ext} PALM_MIN_THUMB_REACH={reach}  F0.5 {score:.3f}  "
-          f"precision {s['precision']:.3f} recall {s['recall']:.3f} (tp {s['tp']}, fp {s['fp']}, fn {s['fn']})")
+    rows = gesture_data.load("fit")
+    for thumb in THUMB_MEASURES:
+        (score, _), ext, value, s = fit(rows, thumb)
+        print(f"fit split, thumb {thumb}: PALM_MIN_EXTENSION={ext} PALM_MIN_THUMB={value}  F0.5 {score:.3f}  "
+              f"precision {s['precision']:.3f} recall {s['recall']:.3f} (tp {s['tp']}, fp {s['fp']}, fn {s['fn']})")
 
 
 if __name__ == "__main__":
