@@ -33,7 +33,7 @@ def replay(frames):
             palm.update(False)
             fist.update(False)
         fist_seen = is_fist(points, config.FIST_MAX_EXTENSION, config.FIST_MAX_THUMB_REACH)
-        palm_seen = not fist_seen and is_palm(points, config.PALM_MIN_EXTENSION, config.PALM_MIN_THUMB_REACH)
+        palm_seen = not fist_seen and is_palm(points, config.PALM_MIN_EXTENSION, config.PALM_MIN_THUMB_EXTENSION)
         counts["palm"] += bool(palm.update(palm_seen, points if palm_seen else None))
         counts["fist"] += bool(fist.update(fist_seen))
         previous = t

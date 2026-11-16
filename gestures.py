@@ -53,18 +53,15 @@ def thumb_extension(points):
     return None if base == 0 else _distance(points, WRIST, THUMB_TIP) / base
 
 
-def palm_features(points, thumb="reach"):
-    """(smallest finger extension, thumb measure), or None. The open palm is the mirror of the fist: the
-    smallest extension is high only when every finger is straight, and the thumb is out. `thumb` picks the
-    thumb measure: "reach" (tip to middle knuckle over hand size) or "extension" (see thumb_extension)."""
+def palm_features(points):
+    """(smallest finger extension, thumb extension), or None. The open palm is the mirror of the fist: the
+    smallest extension is high only when every finger is straight, and the thumb is held out. The thumb
+    measure was chosen over the fist's thumb reach because it fitted better (see tools/fit_palm.py)."""
     measured = _extensions_and_reach(points)
-    if measured is None:
-        return None
-    extensions, reach = measured
-    if thumb == "reach":
-        return min(extensions), reach
     out = thumb_extension(points)
-    return None if out is None else (min(extensions), out)
+    if measured is None or out is None:
+        return None
+    return min(measured[0]), out
 
 
 def is_fist(points, max_extension, max_thumb_reach):
@@ -76,13 +73,13 @@ def is_fist(points, max_extension, max_thumb_reach):
     return extension <= max_extension and reach <= max_thumb_reach
 
 
-def is_palm(points, min_extension, min_thumb, thumb="reach"):
+def is_palm(points, min_extension, min_thumb_extension):
     """True when all four fingers are straight and the thumb is out: an open hand, seen from any side."""
-    features = palm_features(points, thumb)
+    features = palm_features(points)
     if features is None:
         return False
-    extension, thumb_value = features
-    return extension >= min_extension and thumb_value >= min_thumb
+    extension, thumb = features
+    return extension >= min_extension and thumb >= min_thumb_extension
 
 
 class GestureHold:

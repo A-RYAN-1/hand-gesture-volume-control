@@ -73,7 +73,7 @@ def test_calibration_file_can_be_moved(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize("name, value", [("PALM_HOLD_FRAMES", "0"), ("PALM_STILL_MOVE", "0"),
-                                         ("PALM_MIN_EXTENSION", "0"), ("PALM_MIN_THUMB_REACH", "-1")])
+                                         ("PALM_MIN_EXTENSION", "0"), ("PALM_MIN_THUMB_EXTENSION", "-1")])
 def test_bad_palm_settings_are_rejected(monkeypatch, name, value):
     monkeypatch.setenv(name, value)
     with pytest.raises(SystemExit, match=name):

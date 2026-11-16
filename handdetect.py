@@ -86,7 +86,7 @@ def main():
                 if fist.update(fist_seen):  # no mute while a calibration sweeps the pinch
                     volume.SetMute(not volume.GetMute(), None)
                 palm_seen = (config.PALM_PLAY_PAUSE and session is None and not fist_seen
-                             and is_palm(points, config.PALM_MIN_EXTENSION, config.PALM_MIN_THUMB_REACH))
+                             and is_palm(points, config.PALM_MIN_EXTENSION, config.PALM_MIN_THUMB_EXTENSION))
                 if palm.update(palm_seen, points if palm_seen else None):
                     media.toggle_play_pause()
                     notice, notice_until = "Play/pause", time.monotonic() + PLAY_PAUSE_NOTICE_SECONDS

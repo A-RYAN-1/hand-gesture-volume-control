@@ -13,43 +13,49 @@ import replay_false_triggers  # noqa: E402
 from test_gestures import CURLED_TIPS, STRAIGHT_TIPS, THUMB_UP, TUCKED_THUMB, hand  # noqa: E402
 
 THUMB_OUT = (-120, -80)
+THUMB_BASE = (-40, -60)  # landmark 2, the thumb knuckle; the shared fixture leaves it at the wrist
+
+
+def palm_hand(tips, thumb, scale=1.0):
+    points = hand(tips, thumb, scale)
+    points[2] = [2, THUMB_BASE[0] * scale, THUMB_BASE[1] * scale]
+    return points
 
 
 def open_hand(dx=0.0, scale=1.0):
-    points = hand(STRAIGHT_TIPS, THUMB_OUT, scale)
-    return [[i, x + dx, y] for i, x, y in points]
+    return [[i, x + dx, y] for i, x, y in palm_hand(STRAIGHT_TIPS, THUMB_OUT, scale)]
 
 
 def test_an_open_hand_with_the_thumb_out_is_a_palm():
-    assert is_palm(hand(STRAIGHT_TIPS, THUMB_OUT), 1.0, 0.8)
+    assert is_palm(palm_hand(STRAIGHT_TIPS, THUMB_OUT), 1.27, 1.34)
 
 
 def test_four_fingers_with_the_thumb_tucked_is_not_a_palm():
-    assert not is_palm(hand(STRAIGHT_TIPS, TUCKED_THUMB), 1.0, 0.8)
+    assert not is_palm(palm_hand(STRAIGHT_TIPS, TUCKED_THUMB), 1.27, 1.34)
 
 
 def test_a_fist_and_a_pinch_like_hand_are_not_a_palm():
-    assert not is_palm(hand(CURLED_TIPS, THUMB_UP), 1.0, 0.8)
+    assert not is_palm(palm_hand(CURLED_TIPS, THUMB_UP), 1.27, 1.34)
     one_finger_curled = {**STRAIGHT_TIPS, 12: CURLED_TIPS[12]}
-    assert not is_palm(hand(one_finger_curled, THUMB_OUT), 1.0, 0.8)
+    assert not is_palm(palm_hand(one_finger_curled, THUMB_OUT), 1.27, 1.34)
 
 
 def test_a_hand_is_never_both_a_fist_and_a_palm():
     for tips in (STRAIGHT_TIPS, CURLED_TIPS):
         for thumb in (TUCKED_THUMB, THUMB_OUT, THUMB_UP):
-            points = hand(tips, thumb)
-            assert not (is_fist(points, 0.77, 0.56) and is_palm(points, 1.0, 0.8))
+            points = palm_hand(tips, thumb)
+            assert not (is_fist(points, 0.77, 0.56) and is_palm(points, 1.27, 1.34))
 
 
 @pytest.mark.parametrize("scale", [0.25, 2, 4])
 def test_palm_features_do_not_depend_on_distance_from_the_camera(scale):
-    assert palm_features(hand(STRAIGHT_TIPS, THUMB_OUT, scale)) == pytest.approx(
-        palm_features(hand(STRAIGHT_TIPS, THUMB_OUT)))
+    assert palm_features(palm_hand(STRAIGHT_TIPS, THUMB_OUT, scale)) == pytest.approx(
+        palm_features(palm_hand(STRAIGHT_TIPS, THUMB_OUT)))
 
 
 def test_a_degenerate_hand_has_no_features():
     assert palm_features([[i, 0, 0] for i in range(21)]) is None
-    assert not is_palm([[i, 0, 0] for i in range(21)], 1.0, 0.8)
+    assert not is_palm([[i, 0, 0] for i in range(21)], 1.27, 1.34)
 
 
 def feed(hold, frames):

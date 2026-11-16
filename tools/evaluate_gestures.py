@@ -33,12 +33,12 @@ def evaluate(rows, max_extension=None, max_thumb_reach=None):
     return result
 
 
-def evaluate_palm(rows, min_extension=None, min_thumb_reach=None):
+def evaluate_palm(rows, min_extension=None, min_thumb_extension=None):
     """The same report for the open palm (HaGRID `palm`, `stop`, `stop_inverted`) with the thresholds in config.py."""
     ext = config.PALM_MIN_EXTENSION if min_extension is None else min_extension
-    reach = config.PALM_MIN_THUMB_REACH if min_thumb_reach is None else min_thumb_reach
+    thumb = config.PALM_MIN_THUMB_EXTENSION if min_thumb_extension is None else min_thumb_extension
     labels = [label for label, _ in rows]
-    predicted = [is_palm(points, ext, reach) for _, points in rows]
+    predicted = [is_palm(points, ext, thumb) for _, points in rows]
     result = gesture_data.scores(predicted, labels, positive=PALM_LABELS)
     per_label = {}
     for p, label in zip(predicted, labels):
@@ -59,7 +59,7 @@ def main(argv):
         print(f"  {label:<16} {share:.3f}")
     palm = evaluate_palm(gesture_data.load(name))
     if palm["tp"] + palm["fn"]:
-        print(f"open palm (thresholds extension {config.PALM_MIN_EXTENSION}, thumb reach {config.PALM_MIN_THUMB_REACH}):")
+        print(f"open palm (thresholds extension {config.PALM_MIN_EXTENSION}, thumb extension {config.PALM_MIN_THUMB_EXTENSION}):")
         print(f"palm precision {palm['precision']:.3f}  recall {palm['recall']:.3f}  (tp {palm['tp']}, fp {palm['fp']}, fn {palm['fn']})")
         print("share of each label taken for an open palm:")
         for label, share in palm["taken_for_palm"].items():
