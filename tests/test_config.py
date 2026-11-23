@@ -85,3 +85,23 @@ def test_play_pause_is_on_by_default_and_can_be_turned_off(monkeypatch):
     monkeypatch.setenv("PALM_PLAY_PAUSE", "0")
     importlib.reload(config)
     assert config.PALM_PLAY_PAUSE is False
+
+
+def test_gesture_map_defaults_when_no_file_is_set():
+    assert config.GESTURE_MAP == {"pinch": "volume", "fist": "mute", "palm": "play_pause"}
+
+
+def test_gesture_map_file_swaps_the_actions(monkeypatch, tmp_path):
+    path = tmp_path / "map.json"
+    path.write_text('{"fist": "play_pause", "palm": "mute"}', encoding="utf-8")
+    monkeypatch.setenv("GESTURE_MAP_FILE", str(path))
+    importlib.reload(config)
+    assert config.GESTURE_MAP["fist"] == "play_pause" and config.GESTURE_MAP["palm"] == "mute"
+
+
+def test_invalid_gesture_map_stops_the_start_with_the_line(monkeypatch, tmp_path):
+    path = tmp_path / "map.json"
+    path.write_text('{\n"fist": "shout"\n}', encoding="utf-8")
+    monkeypatch.setenv("GESTURE_MAP_FILE", str(path))
+    with pytest.raises(SystemExit, match=r"GESTURE_MAP_FILE: .*line 2"):
+        importlib.reload(config)
