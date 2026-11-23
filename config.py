@@ -1,6 +1,8 @@
 """All tunable values, read from environment variables (see .env.example)."""
 import os
 
+import gesture_map
+
 
 def _number(name, default, cast=float):
     raw = os.environ.get(name)
@@ -45,6 +47,12 @@ MUTE_HOLD_FRAMES = _number("MUTE_HOLD_FRAMES", 10, int)
 BACKGROUND = (os.environ.get("BACKGROUND") or "").lower() in ("1", "true", "yes")
 QUIT_KEY = os.environ.get("QUIT_KEY") or "q"
 INDICATOR_SECONDS = _number("INDICATOR_SECONDS", 2.0)
+# Optional JSON file that maps each gesture (pinch, fist, palm) to an action; see gesture_map.py and the README.
+GESTURE_MAP_FILE = os.environ.get("GESTURE_MAP_FILE") or ""
+try:
+    GESTURE_MAP = gesture_map.load(GESTURE_MAP_FILE)
+except gesture_map.GestureMapError as e:
+    raise SystemExit(f"GESTURE_MAP_FILE: {e}")
 MAX_HANDS = _number("MAX_HANDS", 1, int)
 DETECTION_CONFIDENCE = _number("DETECTION_CONFIDENCE", 0.5)
 

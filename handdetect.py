@@ -44,6 +44,11 @@ class HandTracker:
         return result.multi_hand_landmarks[0] if result.multi_hand_landmarks else None
 
 
+def gesture_for(action):
+    """The gesture mapped to a one-shot action, or None when none is."""
+    return next((g for g, a in config.GESTURE_MAP.items() if a == action), None)
+
+
 def open_volume_control():
     """The default speaker's endpoint volume (pycaw 2024+ exposes it as a property)."""
     return AudioUtilities.GetSpeakers().EndpointVolume
@@ -64,7 +69,22 @@ def main():
     session = None
     notice, notice_until = "", 0.0
     fist = GestureHold(config.MUTE_HOLD_FRAMES)
+    drives_volume = config.GESTURE_MAP["pinch"] == "volume"
+    mute_gesture = gesture_for("mute")
     palm = PalmHold(config.PALM_HOLD_FRAMES, config.PALM_STILL_MOVE)
+
+    def fire(action):
+        """Run the one-shot action a held gesture is mapped to."""
+        nonlocal smoothed, notice, notice_until
+        if action == "mute":
+            volume.SetMute(not volume.GetMute(), None)
+        elif action == "play_pause":
+            media.toggle_play_pause()
+            notice, notice_until = "Play/pause", time.monotonic() + PLAY_PAUSE_NOTICE_SECONDS
+        elif action == "lock":
+            lock.toggle(percent)
+            smoothed = None
+
     if background:
         hotkeys = HotkeyPoller({"lock": virtual_key(config.LOCK_KEY), "calibrate": virtual_key(config.CALIBRATE_KEY),
                                 "quit": virtual_key(config.QUIT_KEY)})
@@ -83,16 +103,15 @@ def main():
                 cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                 ratio = pinch_ratio(points)
                 fist_seen = session is None and is_fist(points, config.FIST_MAX_EXTENSION, config.FIST_MAX_THUMB_REACH)
-                if fist.update(fist_seen):  # no mute while a calibration sweeps the pinch
-                    volume.SetMute(not volume.GetMute(), None)
+                if fist.update(fist_seen):  # no one-shot action while a calibration sweeps the pinch
+                    fire(config.GESTURE_MAP["fist"])
                 palm_seen = (config.PALM_PLAY_PAUSE and session is None and not fist_seen
                              and is_palm(points, config.PALM_MIN_EXTENSION, config.PALM_MIN_THUMB_EXTENSION))
                 if palm.update(palm_seen, points if palm_seen else None):
-                    media.toggle_play_pause()
-                    notice, notice_until = "Play/pause", time.monotonic() + PLAY_PAUSE_NOTICE_SECONDS
+                    fire(config.GESTURE_MAP["palm"])
                 if session is not None:
                     session.add(ratio)  # the volume stays put while the user sweeps the pinch
-                elif ratio is not None and not fist.forming and not palm.forming:
+                elif drives_volume and ratio is not None and not fist.forming and not palm.forming:
                     # a closing fist also closes the pinch, and an open palm is a fully open pinch: hold the
                     # volume until the hand is neither
                     smoothed = smooth(smoothed, ratio, config.SMOOTHING_ALPHA)
@@ -124,7 +143,7 @@ def main():
             if lock.locked:
                 cv2.putText(frame, f"LOCKED ({config.LOCK_KEY} to unlock)", (40, 100), cv2.FONT_HERSHEY_COMPLEX, 1, (0, 0, 255), 3)
             if volume.GetMute():
-                cv2.putText(frame, "MUTED (hold a fist to unmute)", (40, 60), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 255), 2)
+                cv2.putText(frame, f"MUTED (hold a {mute_gesture} to unmute)" if mute_gesture else "MUTED", (40, 60), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 0, 255), 2)
             if session is not None:
                 cv2.putText(frame, f"CALIBRATING {session.remaining(now):.0f}s: open and close the pinch", (40, 130),
                             cv2.FONT_HERSHEY_COMPLEX, 0.7, (255, 255, 0), 2)

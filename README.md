@@ -27,7 +27,7 @@
   <img src="docs/images/demo.jpg" width="60%" alt="The preview window: tracked hand landmarks, a magenta line between thumb and index finger, and a green volume bar at 75 percent">
 </p>
 
-<p align="center"><sub>Last updated: 2026-11-16 &middot; Runs locally on Windows (checked 2026-10-17); no hosted version, it needs your webcam and speakers</sub></p>
+<p align="center"><sub>Last updated: 2026-11-23 &middot; Runs locally on Windows (checked 2026-10-17); no hosted version, it needs your webcam and speakers</sub></p>
 
 ---
 
@@ -87,6 +87,7 @@ Not deployed yet, and it cannot be: the program needs your webcam and your Windo
 - **Calibration to your hand**: press `C` (change with `CALIBRATE_KEY`) and open and close the pinch for 5 seconds; the 5th and 95th percentiles of your pinch become 0% and 100%, so a small hand or a stiff thumb still reaches both ends. Saved to `~/.hand-gesture-volume-control/calibration.json` (`CALIBRATION_FILE`) and loaded at start; refused with a reason when fewer than 30 frames had a hand or the pinch barely moved.
 - **Fist to mute**: a fist held for 10 frames (about a third of a second, `MUTE_HOLD_FRAMES`) toggles mute once; release it before it can toggle again. While a fist is forming the volume holds still, so closing the hand does not first drag the volume to 0. Measured on 3,223 held-out hands: precision 0.934, recall 0.785 (see *Engineering quality*).
 - **Open palm to play or pause**: an open hand (all four fingers straight, thumb out) held still for 30 frames (about a second, `PALM_HOLD_FRAMES`), the knuckle drifting no more than a quarter of the hand size (`PALM_STILL_MOVE`), sends the Windows play/pause media key once; any player that listens for media keys reacts. Release the hand before it can fire again. While a palm is forming the volume holds still, because a fully open pinch looks like a palm. `PALM_PLAY_PAUSE=0` turns it off. Measured on 3,223 held-out hands: precision 0.644, recall 0.751, and a relaxed open hand looks like a palm in a single photo (26.7% of resting hands), which is why the hold is required (see *Engineering quality*).
+- **Gesture map file**: `GESTURE_MAP_FILE` points to a JSON file that chooses what each gesture does; gestures you leave out keep their default (`pinch`: `volume`, `fist`: `mute`, `palm`: `play_pause`). `pinch` can be `volume` or `none`; `fist` and `palm` can be `mute`, `play_pause`, `lock` or `none`, and one action can belong to only one gesture. For example `gesture-map.example.json` swaps the two: `{"fist": "play_pause", "palm": "mute"}`. A map with a mistake stops the start with a plain message naming the file and the line, for example `fist cannot do 'shout'; use mute, play_pause, lock, none`. The hold rules stay with the gesture, so a fist still needs 10 frames and a palm 30 still frames whatever they do.
 - **Background mode** (`--background` or `BACKGROUND=1`): no preview window; a small always-on-top box in the bottom-right corner shows the volume, LOCKED and MUTED for `INDICATOR_SECONDS` after any change and hides itself. `Ctrl+Alt` plus the lock key, the calibrate key or `QUIT_KEY` (default `q`) work from any window; only those three keys and the two modifiers are ever read. `python tools/startup.py install|remove|status` manages a hidden script in the Windows Startup folder. The camera stays on while it runs.
 - **Live feedback**: the window shows the tracked hand, the pinch line and a volume bar with a percentage.
 - **Mirrored preview**: the image is flipped so moving your hand right moves it right on screen.
@@ -261,6 +262,7 @@ the ones you change (for example `export CAMERA_INDEX=1` in Git Bash before runn
 | `PALM_HOLD_FRAMES` | frames in a row the open palm must be held still before play/pause | `30` |
 | `PALM_STILL_MOVE` | how far the hand may drift while held, as a fraction of the hand size | `0.25` |
 | `PALM_PLAY_PAUSE` | `0` turns the open-palm gesture off | `1` |
+| `GESTURE_MAP_FILE` | JSON file mapping each gesture to an action (see *Features*); empty keeps the defaults | empty |
 | `BACKGROUND` | `1` runs without the preview window (same as `--background`) | `0` |
 | `QUIT_KEY` | letter or digit that quits in background mode with Ctrl+Alt (not the lock or calibrate key) | `q` |
 | `INDICATOR_SECONDS` | how long the background indicator stays after a change | `2` |
@@ -284,6 +286,7 @@ is nothing to host. The realistic "release" is this repository run locally.
 - Windows only.
 - Background mode started from the Startup folder has no console, so a start-up error (no camera, wrong camera index) shows nothing; run `python handdetect.py --background` once in a terminal to see it. Its CPU use was not measured.
 - Tested by hand with one hand and one camera; the pinch is relative to hand size, but a hand turned edge-on to the camera reads as a wider pinch, and the 0.15 and 1.0 defaults have not been tuned on a live webcam.
+- The gesture map was checked by unit tests (120 pass on 2026-11-23) and not with a live webcam; a map that gives a gesture a different action keeps that gesture's fitted thresholds and hold, so a swapped map is as accurate as the gesture, not the action.
 - The first hand MediaPipe reports controls the volume, left or right.
 - Smoothing is verified on synthetic noise only; the real jitter of your webcam and hand has not been measured.
 - The fist classifier is measured on photos (HaGRID), whose image size is not recorded, so distance ratios carry the photo's aspect; false mutes per minute of webcam video are not measured. `tools/record_landmarks.py idle 60 me.jsonl` and `tools/evaluate_gestures.py me.jsonl` give that number for your own camera.
@@ -295,6 +298,9 @@ is nothing to host. The realistic "release" is this repository run locally.
 - [x] Background mode with an indicator, global hotkeys and a start-with-Windows option (2026-11-14).
 - [ ] Measure false mutes per minute on a recorded webcam session.
 - [x] A second gesture for play and pause: open palm held still (2026-11-16).
+- [x] A gesture map file that chooses the action of each gesture (2026-11-23).
+- [ ] System tray app and a packaged Windows executable.
+- [ ] Camera selection and diagnostics for a dark room or the wrong camera.
 
 ## Credits
 
